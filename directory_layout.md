@@ -1,0 +1,372 @@
+# TO BE MORE THOROUGHLY FINISHED - PROTOTYPE DESIGN #
+
+|Root - /mnt/home2/mud/
+├── efuns
+├── systems
+│   ├── combat.py
+│   ├── skills_handler.py
+│   ├── tactics.py
+│   ├── inventory_handler.py
+│   ├── soul_handler.py
+│   │   ├── souls/
+│   │   │   ├── # Dynamic list from https://discworld.starturtle.net/lpc/playing/soul.c
+│   ├── term_handler.py
+│   ├── network_handler.py
+│   ├── quests_handler.py
+│   ├── crafting_handler.py
+│   │   ├── smithing/
+│   │   │   ├── sword_crafting.py
+│   │   │   ├── armor_crafting.py
+│   │   ├── mining/
+│   │   │   ├── ore_extraction.py
+│   │   ├── culinary/
+│   │   │   ├── cooking_recipe.py
+│   ├── alias.py # Supports categories, .plan, .project from /helpdir/alias_tutorial
+│   ├── mail.py # Cc, folders, .signature from /helpdir/mail
+│   ├── communicate.py # say, tell, shout, talker from /helpdir/hcomm, /other_players
+│   ├── creator.py # Forgotten Realms deity hierarchy (e.g., Mystra as trustee), domain management
+│   ├── family.py # Family control rooms, relationships from /room/family_control_room
+│   ├── finger.py # Creator/playtester flags, .plan, .project from /other_players
+│   ├── friends.py # Login notifications from /other_players
+│   ├── history.py # Merges htell, hsoul, hsay from /helpdir/hcomm
+│   ├── nickname.py # Supports dnickname from /helpdir/ealias
+│   ├── options_control.py # usercolour, cols, rows from /concepts/display
+│   ├── zones.py
+│   ├── room.py # Base system inheriting all systems
+│   ├── terrain.py
+│   ├── weather.py
+│   ├── events.py
+│   ├── taskmaster.py
+│   ├── living.py
+│   ├── parser.py
+│   ├── organizations.py
+│   ├── houses.py
+│   ├── pk.py
+│   ├── mounts.py # Includes pegasus.py from https://forgottenrealms.fandom.com/wiki/Category:Mounts
+│   ├── cmds.py # Includes pray.py, guild.py from https://dwwiki.mooo.com/wiki/Commands, /wiki/Category:Guild_commands
+│   ├── cmds_base_handler.py # Non-innate commands from /std/commands/
+│   ├── terrain_handler.py
+│   ├── login_handler.py
+│   ├── languages.py
+│   │   ├── spoken/
+│   │   │   ├── common.py
+│   │   │   ├── drow.py
+│   │   │   ├── elvish.py
+│   │   │   ├── dwarvish.py
+│   │   │   ├── draconic.py # From https://forgottenrealms.fandom.com/wiki/Category:Languages
+│   │   ├── written/
+│   │   │   ├── common.py
+│   │   │   ├── drow.py
+│   │   │   ├── elvish.py
+│   │   │   ├── dwarvish.py
+│   │   │   ├── draconic.py
+│   ├── ritual_handler.py
+│   │   ├── rituals/
+│   │   │   ├── generic/
+│   │   │   ├── heal_ritual.py
+│   │   │   ├── banish_ritual.py
+│   │   │   ├── racial/
+│   │   │   │   ├── drow/
+│   │   │   │   ├── elf/
+│   │   │   ├── class/
+│   ├── spell_handler.py
+│   │   ├── spells/
+│   │   │   ├── generic/
+│   │   │   │   ├── fireball.py
+│   │   │   │   ├── heal.py
+│   │   │   ├── racial/
+│   │   │   │   ├── drow/
+│   │   │   │   │   ├── shadowbolt.py
+│   │   │   │   ├── elf/
+│   │   │   │   │   ├── moonbeam.py
+│   │   │   ├── class/
+│   │   │   │   ├── wizard/
+│   │   │   │   │   ├── arcane_blast.py
+│   │   │   │   ├── cleric/
+│   │   │   │   │   ├── divine_smite.py
+├── std/
+│   ├── object.py
+│   │   ├── weapons.py
+│   │   ├── armors.py
+│   │   ├── clothing.py
+│   │   ├── items.py
+│   │   ├── wearable.py
+│   │   ├── container.py
+│   │   ├── amulets.py
+│   │   ├── food.py
+│   │   ├── liquids.py
+│   │   ├── gatherables.py
+│   │   ├── jewellery.py
+│   │   ├── monster.py # Keep as monster or change to npc?
+│   │   ├── plants.py
+│   │   ├── potions.py
+│   │   ├── reagents.py
+│   │   ├── scabbards.py
+│   │   ├── baggage.py # From autodoc /obj/baggage.c
+│   │   ├── clock.py # From autodoc /obj/clock.c
+│   │   ├── vessel.py # From autodoc /obj/vessel.c
+│   ├── living.py
+│   ├── npc.py
+│   ├── mounts/
+│   │   ├── horse.py
+│   │   ├── bloodhorse.py
+│   │   ├── wyvern.py
+│   │   ├── manticore.py
+│   │   ├── axebeak.py
+│   │   ├── chimera.py
+│   │   ├── nightmare.py
+│   │   ├── ki_rin.py
+│   │   ├── worg.py
+│   │   ├── hollyphant.py
+│   │   ├── mule.py
+│   │   ├── dragon.py
+│   │   ├── pegasus.py
+│   ├── rooms/
+│   │   ├── inside.py
+│   │   ├── outside.py
+│   │   ├── shops.py
+│   │   ├── auction_house.py # From /room/auction_house.c
+│   │   ├── bank.py # From /room/bank.c
+│   ├── commands/
+│   │   ├── kill.py
+│   │   ├── look.py
+│   │   ├── inventory.py
+│   │   ├── say.py
+│   │   ├── shout.py
+│   │   ├── smile.py
+│   │   ├── help.py
+│   │   ├── who.py
+│   │   ├── score.py
+│   │   ├── train.py
+│   │   ├── advance.py
+│   │   ├── learn.py
+│   │   ├── teach.py
+│   │   ├── worship.py
+│   │   ├── pray.py # From https://dwwiki.mooo.com/wiki/Commands
+│   │   ├── guild.py # From https://dwwiki.mooo.com/wiki/Category:Guild_commands
+│   ├── classes.py
+│   │   ├── generic/
+│   │   │   ├── fighter.py
+│   │   │   ├── wizard.py
+│   │   │   ├── cleric.py
+│   │   │   ├── priest.py
+│   │   │   ├── thief.py
+│   │   ├── racial/
+│   │   │   ├── drow/
+│   │   │   │   ├── drow_warrior.py
+│   │   │   │   ├── drow_mage.py
+│   │   │   ├── elf/
+│   │   │   │   ├── elf_bladedancer.py
+│   ├── races.py
+│   │   ├── human.py
+│   │   ├── elf.py
+│   │   ├── drow.py
+│   │   ├── dwarf.py
+│   │   ├── orc.py
+│   │   ├── gnome.py
+│   │   ├── halfling.py
+│   │   ├── tiefling.py
+│   │   ├── aarakocra.py
+│   │   ├── dragonborn.py
+│   │   ├── goliath.py
+│   │   ├── genasi.py
+│   │   ├── tabaxi.py
+│   │   ├── triton.py
+│   │   ├── yuan_ti.py
+│   │   ├── firbolg.py
+│   │   ├── kenku.py
+│   │   ├── kobold.py
+│   │   ├── lizardfolk.py
+│   │   ├── changeling.py
+│   │   ├── warforged.py
+│   ├── organizations.py
+│   │   ├── harpers.py
+│   │   ├── zhentarim.py
+│   │   ├── red_wizards.py
+│   │   ├── cult_of_dragon.py
+│   │   ├── lords_alliance.py
+│   │   ├── seven_sisters.py
+│   │   ├── fire_knives.py
+│   │   ├── xanathars_guild.py
+│   │   ├── shades.py
+│   │   ├── drow_houses/
+│   │   │   ├── house_baenre.py
+│   │   │   ├── house_noquar.py
+│   │   ├── orc_clans/
+│   │   │   ├── clan_blade_of_the_black_dog.py
+│   │   │   ├── clan_blood_of_the_red_fang.py
+├── domains/
+│   ├── sword_coast/
+│   │   ├── waterdeep/
+│   │   │   ├── rooms.py
+│   │   │   ├── npcs.py
+│   │   │   ├── items.py
+│   │   │   ├── guilds.py
+│   │   │   ├── docks/
+│   │   │   │   ├── rooms.py
+│   │   │   ├── market/
+│   │   │   │   ├── rooms.py
+│   │   │   ├── castle/
+│   │   │   │   ├── rooms.py
+│   │   ├── neverwinter/
+│   │   │   ├── rooms.py
+│   │   │   ├── npcs.py
+│   │   │   ├── items.py
+│   │   │   ├── guilds.py
+│   │   ├── baldur_gate/
+│   │   │   ├── rooms.py
+│   │   │   ├── npcs.py
+│   │   │   ├── items.py
+│   │   │   ├── guilds.py
+│   │   ├── candlekeep/
+│   │   │   ├── rooms.py
+│   │   │   ├── npcs.py
+│   │   │   ├── items.py
+│   │   ├── daggerford/
+│   │   │   ├── rooms.py
+│   │   │   ├── npcs.py
+│   │   │   ├── items.py
+│   │   ├── luskan/
+│   │   │   ├── rooms.py
+│   │   │   ├── npcs.py
+│   │   │   ├── items.py
+│   │   ├── phandalin/
+│   │   │   ├── rooms.py
+│   │   │   ├── npcs.py
+│   │   │   ├── items.py
+│   ├── underdark/
+│   │   ├── menzoberranzan/
+│   │   │   ├── rooms.py
+│   │   │   ├── npcs.py
+│   │   │   ├── items.py
+│   │   │   ├── houses/
+│   │   │   │   ├── house_baenre/
+│   │   │   │   │   ├── rooms.py
+│   │   │   │   ├── house_noquar/
+│   │   │   │   │   ├── rooms.py
+│   │   ├── ched_nasad/
+│   │   │   ├── rooms.py
+│   │   │   ├── npcs.py
+│   │   │   ├── items.py
+│   │   ├── gracklstugh/
+│   │   │   ├── rooms.py
+│   │   │   ├── npcs.py
+│   │   │   ├── items.py
+│   │   ├── sshamath/
+│   │   │   ├── rooms.py
+│   │   │   ├── npcs.py
+│   │   │   ├── items.py
+│   ├── cormanthor/
+│   │   ├── rooms.py
+│   │   ├── npcs.py
+│   │   ├── items.py
+│   │   ├── villages/
+│   │   │   ├── elventree/
+│   │   │   │   ├── rooms.py
+│   │   │   ├── tangled_trees/
+│   │   │   │   ├── rooms.py
+│   ├── icewind_dale/
+│   │   ├── ten_towns/
+│   │   │   ├── bryn_shander/
+│   │   │   │   ├── rooms.py
+│   │   │   ├── targos/
+│   │   │   │   ├── rooms.py
+│   │   ├── rooms.py
+│   │   ├── npcs.py
+│   │   ├── items.py
+│   ├── calimshan/
+│   │   ├── calimport/
+│   │   │   ├── rooms.py
+│   │   │   ├── npcs.py
+│   │   │   ├── items.py
+│   │   │   ├── guilds.py
+│   │   ├── memnon/
+│   │   │   ├── rooms.py
+│   │   │   ├── npcs.py
+│   │   │   ├── items.py
+│   ├── vast_swamp/
+│   │   ├── rooms.py
+│   │   ├── npcs.py
+│   │   ├── items.py
+│   │   ├── villages/
+│   │   │   ├── mossbridge/
+│   │   │   │   ├── rooms.py
+│   ├── damara/
+│   │   ├── heliogabalus/
+│   │   │   ├── rooms.py
+│   │   │   ├── npcs.py
+│   │   │   ├── items.py
+│   │   ├── villages/
+│   │   │   ├── bloodstone/
+│   │   │   │   ├── rooms.py
+│   ├── anauroch/
+│   │   ├── rooms.py
+│   │   ├── npcs.py
+│   │   ├── items.py
+│   ├── high_forest/
+│   │   ├── rooms.py
+│   │   ├── npcs.py
+│   │   ├── items.py
+│   │   ├── settlements/
+│   │   │   ├── star_mount/
+│   │   │   │   ├── rooms.py
+│   ├── world/
+│   │   ├── terrain.py
+│   │   ├── map.py # Dot-grid from /helpdir/map
+├── players/
+│   ├── archaon.json
+│   ├── banish/ # a-z subfolders for banished players
+│   │   ├── a/
+│   │   ├── b/
+│   │   ├── c/
+│   │   ├── ...
+│   │   ├── z/
+│   ├── database.py # Add gzip support for .o.gz saves
+├── logs/
+│   ├── server.log
+│   ├── errors.log
+│   ├── combat.log
+│   ├── player.log
+├── website/
+│   ├── index.html
+│   ├── client.js
+│   ├── ai_client.js # For future AI integration
+│   ├── boards.html # From /www/secure/boards.c
+│   ├── finger.html # From /www/secure/finger.c
+│   ├── marketing/
+│   │   ├── promo.html
+│   │   ├── banners/
+├── objects/
+│   ├── weapons/
+│   │   ├── knives.py # From /obj/weapons/knives/
+│   ├── rings.py # From /obj/rings/
+│   ├── mounts/
+│   │   ├── horse.py
+│   │   ├── bloodhorse.py
+│   │   ├── wyvern.py
+│   │   ├── manticore.py
+│   │   ├── axebeak.py
+│   │   ├── chimera.py
+│   │   ├── nightmare.py
+│   │   ├── ki_rin.py
+│   │   ├── worg.py
+│   │   ├── hollyphant.py
+│   │   ├── mule.py
+│   │   ├── dragon.py
+│   │   ├── pegasus.py
+│   ├── organizations/
+│   │   ├── harpers.py
+│   │   ├── zhentarim.py
+│   │   ├── red_wizards.py
+│   │   ├── cult_of_dragon.py
+│   │   ├── lords_alliance.py
+│   │   ├── seven_sisters.py
+│   │   ├── fire_knives.py
+│   │   ├── xanathars_guild.py
+│   │   ├── shades.py
+│   │   ├── drow_houses/
+│   │   │   ├── house_baenre.py
+│   │   │   ├── house_noquar.py
+│   │   ├── orc_clans/
+│   │   │   ├── clan_blade_of_the_black_dog.py
+│   │   │   ├── clan_blood_of_the_red_fang.py
