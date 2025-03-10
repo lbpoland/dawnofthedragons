@@ -1,3 +1,5 @@
+# Imported to: room.py, wall.py
+# Imports from: driver.py
 # /mnt/home2/mud/systems/rooftop.py
 from typing import Optional, List, Dict, Union
 from ..driver import driver, MudObject, Player
@@ -13,69 +15,69 @@ class Rooftop(MudObject):
         super().__init__(oid, name)
         self.room: Optional[MudObject] = None
         self.wall: Optional[MudObject] = None
-        self.damages: Dict[str, int] = {}
+        self.damages: Dict[str, int] = {"weak": 20, "slope": 15, "step": 10, "jump": 25}  # Default damages
         self.damage_types: List[str] = ["weak", "slope", "step", "jump"]
         self.roof_max_weight: int = 0  # Max weight in units (20 units = 1 kg)
-        self.gradient: int = 0  # Percentage grade (converted from degrees)
+        self.gradient: int = 0  # Percentage grade
         self.weak_roof_dest: Optional[str] = None
         self.slope_dest: Optional[str] = None
-        self.place: str = "roof"
+        self.place: str = "rooftop"
         self.death_reason: Optional[str] = None
         self.jump_info: Dict[str, List[Union[str, int]]] = {}
         self.translations: Dict[str, str] = {}
-        # Message arrays
+        # Messages with Forgotten Realms theming
         self.weak_messages: List[str] = [
-            "The roof collapses! This is going to be painful...\n",
-            "$short$ crashes down through a weak spot in the roof.",
-            "$short$ comes crashing to the ground, landing in a rain of debris.",
-            "You hear an ominous creak.\n"
+            "The rooftop buckles under Shar’s shadow, plunging you downward!\n",
+            "$short$ crashes through a weakened rooftop.",
+            "$short$ plummets from above, debris raining down in Mystra’s name.",
+            "A sinister creak echoes from the tiles.\n"
         ]
         self.slope_messages: List[str] = [
-            "The roof is too steep for you to stand on! It's time to make friends with the floor...\n",
-            "$short$ gets in touch with gravity and slides over the edge of the roof.",
-            "$short$ comes crashing to the ground, landing in a heap."
+            "The steep tiles defy Tymora’s luck, sending you sliding!\n",
+            "$short$ slips off the rooftop’s edge into the abyss.",
+            "$short$ crashes below, a victim of the incline."
         ]
         self.step_messages: List[str] = [
-            "You step off the edge of the roof into midair.\n",
-            "$short$ steps off the edge of the roof and plummets earthwards.",
-            "$short$ comes crashing to the ground, landing in a heap."
+            "You stride off into the Ethereal Veil’s embrace.\n",
+            "$short$ steps off the rooftop, vanishing downward.",
+            "$short$ lands heavily, dust rising from the fall."
         ]
         self.jump_tm_messages: List[str] = [
-            "You leap more gracefully through the air.",
-            "You feel more able to leap tall buildings in a single bound.",
-            "You jump like a mountain goat."
+            "You leap with the grace of a Waterdhavian acrobat.",
+            "Your jumps rival the agility of a Harper scout.",
+            "You bound like a beast of the Dalelands."
         ]
         self.jump_success_messages: List[str] = [
-            "You launch yourself off the edge of the roof and land gracefully on the other side.\n",
-            "$short$ jumps gracefully across the gap to the $dir$.",
-            "$short$ jumps in from across the gap to the $opp_dir$."
+            "You soar across the gap, landing with Mystra’s blessing.\n",
+            "$short$ leaps gracefully to the $dir$.",
+            "$short$ arrives from the $opp_dir$, a shadow in the air."
         ]
         self.jump_failure_messages: List[str] = [
-            "You launch yourself off the edge of the roof!\nUnfortunately you misjudge the distance and plummet earthwards. This is going to hurt...\n",
-            "$short$ jumps off to the $dir$, but misjudges and plummets earthwards.",
-            "$short$ plummets to the ground, landing in a heap."
+            "You misjudge the leap, plummeting as Bane laughs!\n",
+            "$short$ jumps to the $dir$ but falls short, crashing below.",
+            "$short$ tumbles earthward in a heap."
         ]
         self.ghost_fall_messages: List[str] = [
-            "You find your consciousness drifting earthwards.\n",
-            "$the_short$ drifts earthwards.",
-            "$the_short$ drifts in from above, looking somewhat dazed."
+            "Your spirit drifts through the Veil, unbound.\n",
+            "$the_short$ floats downward, ethereal and lost.",
+            "$the_short$ emerges below, a wraith from above."
         ]
         self.item_slope_messages: List[str] = [
-            "$the_short$ tumbles over the edge and plummets to the ground.\n",
-            "Hearing a noise, you look up just as $a_short$ falls off the edge of the roof and hits the ground.\n"
+            "$the_short$ slides off the rooftop into the gloom.\n",
+            "$a_short$ tumbles from the heights, striking below.\n"
         ]
         self.corpse_slope_messages: List[str] = [
-            "$the_short$ tumbles over the edge and plummets to the ground with a sickening thud.\n",
-            "Hearing a noise, you look up just as $the_short$ tumbles over the edge of the roof and hits the ground with a sickening thud.\n"
+            "$the_short$ rolls off, landing with a grim thud.\n",
+            "$the_short$ falls from the rooftop, a lifeless heap.\n"
         ]
 
-    def setup_shadow(self, room: MudObject):
-        """Sets up the rooftop shadow on the given room."""
-        self.room = room
-        self.wall = driver.clone_object("/systems/wall")
-        self.wall.setup_shadow(room)
-        self.room.add_command("jump", "<word'direction'>", lambda dir: self.do_roofjump(dir))
-
+ def setup_shadow(self, room: MudObject):
+    self.room = room
+    self.wall = driver.clone_object("/systems/wall")
+    self.wall.setup_shadow(room)
+    self.room.add_command("jump", "<word'direction'>", lambda dir: self.do_roofjump(dir))
+    self.room.add_command("climb", "roof", lambda: self.do_climb())  # 2025 climb integration
+    
     def destruct_shadow(self):
         """Destroys the rooftop shadow and cleans up."""
         if self.room and self.wall:
@@ -242,49 +244,39 @@ class Rooftop(MudObject):
         self.do_fall(ob, dest, dam_type, messages, None)
         return 0  # Notify fail
 
-    def event_enter(self, obj: MudObject, from_room: Optional[MudObject]):
-        """Handles entering the rooftop with skill checks."""
-        if not obj or obj.query_property("demon") or obj.query_property("floating"):
-            return
+    async def event_enter(self, obj: MudObject, from_room: Optional[MudObject]):
+    if not obj or obj.query_property("demon") or obj.query_property("floating"):
+        return
 
-        obj.add_property(TOO_SOON, 1, 5)
+    obj.add_property(TOO_SOON, 1, 5)
 
-        if self.roof_max_weight:
-            contents = self.room.all_inventory()
-            total_weight = 0
+    if self.roof_max_weight:
+        contents = self.room.all_inventory()
+        total_weight = sum(item.query_weight() + item.query_loc_weight() for item in contents)
+        if total_weight > self.roof_max_weight:
+            await self.room.tell_room(self.weak_messages[3])
+            destob = driver.load_object(self.weak_roof_dest) or driver.load_object("/room/void")
             for item in contents:
-                object_weight = item.query_weight() + item.query_loc_weight()
-                total_weight += object_weight
-
-            if total_weight > self.roof_max_weight:
-                self.room.tell_room(self.weak_messages[3])
-                destob = driver.load_object(self.weak_roof_dest)
-                if not destob:
-                    self.room.tell_room(f"Error loading room {self.weak_roof_dest}, moving to the void.\nPlease contact a creator.\n")
-                    for item in contents:
-                        item.move_with_look("/room/void")
-                    return
-                for item in contents:
-                    driver.call_out(lambda o=item: self.do_fall(o, destob, "weak", self.weak_messages, None), 1)
-                return
-
-        if self.gradient:
-            if obj.query_living():
-                if obj.query_property("dead") or not obj.query_max_weight():
-                    driver.call_out(lambda o=obj: self.do_fall(o, self.slope_dest, "step", self.ghost_fall_messages, None), 1)
-                    return
-                encum = (100 * obj.query_loc_weight()) / obj.query_max_weight()
-                diff = int(math.sin(math.radians(self.gradient)) * (encum * 10))
-                driver.call_out(lambda o=obj: self.gradient_check(o, self.slope_dest, int(diff + (self.gradient * 2))), 1)
-            else:
-                if obj.query_name() in ["death", "binky"]:
-                    return
-                if self.gradient > 3:
-                    messages = self.corpse_slope_messages if obj.query_corpse() else self.item_slope_messages
-                    obj.move(self.slope_dest, self.process_mess(messages[1], obj, None), self.process_mess(messages[0], obj, None))
+                driver.call_out(lambda o=item: self.do_fall(o, destob, "weak", self.weak_messages, None), 1)
             return
 
-        obj.remove_property(TOO_SOON)
+    if self.gradient:
+        if obj.query_living():
+            if obj.query_property("dead") or not obj.query_max_weight():
+                driver.call_out(lambda o=obj: self.do_fall(o, self.slope_dest, "step", self.ghost_fall_messages, None), 1)
+                return
+            encum = (100 * obj.query_loc_weight()) / obj.query_max_weight()
+            diff = int(math.sin(math.radians(self.gradient)) * (encum * 10))
+            await self.gradient_check(obj, self.slope_dest, diff + (self.gradient * 2))
+        else:
+            if obj.query_name() in ["death", "binky"]:
+                return
+            if self.gradient > 3:
+                messages = self.corpse_slope_messages if obj.query_corpse() else self.item_slope_messages
+                obj.move(self.slope_dest, self.process_mess(messages[1], obj, None), self.process_mess(messages[0], obj, None))
+        return
+
+    obj.remove_property(TOO_SOON)
 
     def gradient_check(self, obj: MudObject, destination: str, diff: int):
         """Performs a skill check for sloping roofs."""
@@ -345,6 +337,22 @@ class Rooftop(MudObject):
             return 1
         return 0
 
+async def do_climb(self) -> int:
+    player = driver.this_player()
+    if not player:
+        return 0
+    diff = self.gradient + player.query_loc_weight() // 10  # Difficulty based on slope and weight
+    result = driver.tasker.perform_task(player, ROCK, diff, "TM_FIXED")
+    if result in ["AWARD", "SUCCEED"]:
+        await player.send("You scale the rooftop with skill, finding your footing.\n")
+        return 1
+    elif result == "FAIL":
+        await player.send("You slip while climbing, tumbling downward!\n")
+        self.do_fall(player, self.slope_dest or "/room/void", "slope", self.slope_messages, None)
+        return 0
+    await player.send("The weave unravels—contact a creator.\n")
+    return 0
+
     def test_remove(self, ob: MudObject, flag: int, dest: Union[str, MudObject]) -> bool:
         """Prevents removal if balance hasn’t been caught."""
         if not ob.query_living():
@@ -361,4 +369,5 @@ class Rooftop(MudObject):
         return self.room.test_remove(ob, flag, dest)
 
 async def init(driver_instance):
+    global driver
     driver = driver_instance

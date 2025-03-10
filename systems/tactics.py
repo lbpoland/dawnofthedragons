@@ -1,3 +1,5 @@
+# Imported to: combat.py, options.py, taskmaster.py
+# Imports from: driver.py
 # /mnt/home2/mud/systems/tactics.py
 from typing import Dict, Optional
 from ..driver import driver, Player, MudObject
@@ -5,14 +7,15 @@ import asyncio
 
 class Tactics:
     def __init__(self):
-        self.attitude: str = "neutral"  # insane, offensive, defensive, wimp
-        self.response: str = "neutral"  # parry, dodge, both
-        self.parry: str = "both"  # left, right, both
-        self.attack: str = "both"  # left, right, both
+        self.attitude: str = "neutral"
+        self.response: str = "neutral"
+        self.parry: str = "both"
+        self.attack: str = "both"
         self.parry_unarmed: bool = False
-        self.mercy: str = "ask"  # always, never, ask
-        self.focus_zone: str = "none"  # upper body, lower body, specific zone
-        self.ideal_distance: int = 0  # For USE_DISTANCE
+        self.mercy: str = "ask"
+        self.focus_zone: str = "none"
+        self.ideal_distance: str = "medium"  # 2025: string options over int
+        self.mystra_favor: int = 0  # Forgotten Realms: bonus to tactics
 
 class TacticsHandler:
     ATTITUDE_OPTIONS = ["insane", "offensive", "neutral", "defensive", "wimp"]
@@ -20,8 +23,9 @@ class TacticsHandler:
     PARRY_OPTIONS = ["left", "right", "both"]
     ATTACK_OPTIONS = ["left", "right", "both"]
     MERCY_OPTIONS = ["always", "never", "ask"]
-    FOCUS_OPTIONS = ["none", "upper body", "lower body", "head", "chest", "arms", "legs"]
-
+    FOCUS_OPTIONS = ["none", "head", "chest", "arms", "legs"]  # Simplified for 2025
+    DISTANCE_OPTIONS = ["close", "medium", "long", "none"]  # 2025 update
+    
     def __init__(self):
         self.tactics: Dict[str, Tactics] = {}
 
@@ -39,34 +43,35 @@ class TacticsHandler:
             self.driver.save_object(obj)
 
     async def tactics_command(self, obj: MudObject, caller: Player, arg: str) -> str:
-        if not isinstance(caller, Player):
-            return "Only players can use the tactics command."
-        if caller.oid != obj.oid:
-            return "You can only modify your own tactics."
+    if not isinstance(caller, Player) or caller.oid != obj.oid:
+        return "Only players can adjust their own tactics."
+    tactics = obj.attrs["tactics"]
+    if not arg:
+        return (f"Your current tactics under Mystra’s watch:\n"
+                f"Attitude: {tactics.attitude}\n"
+                f"Response: {tactics.response}\n"
+                f"Parry: {tactics.parry}\n"
+                f"Attack: {tactics.attack}\n"
+                f"Parry Unarmed: {tactics.parry_unarmed}\n"
+                f"Mercy: {tactics.mercy}\n"
+                f"Focus Zone: {tactics.focus_zone}\n"
+                f"Ideal Distance: {tactics.ideal_distance}\n"
+                f"Mystra’s Favor: {tactics.mystra_favor}")
+    args = arg.lower().split()
+    if len(args) != 2:
+        return ("Syntax: tactics <setting> <value>\n"
+                "Settings: attitude, response, parry, attack, parry_unarmed, mercy, focus, distance\n"
+                "See 'tactics help' for details.")
+    setting, value = args
+    if setting == "distance":
+        if value not in self.DISTANCE_OPTIONS:
+            return f"Invalid distance. Options: {', '.join(self.DISTANCE_OPTIONS)}"
+        tactics.ideal_distance = value
+   
 
-        if not arg:
-            tactics = obj.attrs["tactics"]
-            return (f"Your current tactics are:\n"
-                    f"Attitude: {tactics.attitude}\n"
-                    f"Response: {tactics.response}\n"
-                    f"Parry: {tactics.parry}\n"
-                    f"Attack: {tactics.attack}\n"
-                    f"Parry Unarmed: {tactics.parry_unarmed}\n"
-                    f"Mercy: {tactics.mercy}\n"
-                    f"Focus Zone: {tactics.focus_zone}\n"
-                    f"Ideal Distance: {tactics.ideal_distance}")
-
-        args = arg.lower().split()
-        if len(args) != 2:
-            return ("Syntax: tactics <setting> <value>\n"
-                    "Settings: attitude, response, parry, attack, parry_unarmed, mercy, focus, distance\n"
-                    "Use 'tactics help' for more information.")
-
-        setting, value = args
-        tactics = obj.attrs["tactics"]
-
-        if setting == "help":
-            return ("Tactics settings:\n"
+      elif setting == "help":
+        return ("Tactics settings:\n"
+                f"distance [{', '.join(self.DISTANCE_OPTIONS)}]: Preferred combat range.\n"
                     f"attitude [{', '.join(self.ATTITUDE_OPTIONS)}]: How aggressively you fight.\n"
                     f"response [{', '.join(self.RESPONSE_OPTIONS)}]: How you defend.\n"
                     f"parry [{', '.join(self.PARRY_OPTIONS)}]: Which hand to parry with.\n"
@@ -116,8 +121,8 @@ class TacticsHandler:
             return "Unknown setting. Use 'tactics help' for options."
 
         self.tactics[obj.oid] = tactics
-        self.driver.save_object(obj)
-        return f"Tactics updated: {setting} set to {value}."
+    self.driver.save_object(obj)
+    return f"Tactics updated: {setting} set to {value}."
 
     def query_tactics(self, obj: MudObject) -> Tactics:
         self.init_tactics(obj)
@@ -128,15 +133,15 @@ class TacticsHandler:
         obj.attrs["tactics"] = tactics
         self.driver.save_object(obj)
 
-    def query_combat_attitude(self, obj: MudObject) -> str:
-        return self.query_tactics(obj).attitude
+    def query_combat_distance(self, obj: MudObject) -> str:
+    return self.query_tactics(obj).ideal_distance
 
-    def set_combat_attitude(self, obj: MudObject, attitude: str):
-        if attitude not in self.ATTITUDE_OPTIONS:
-            return
-        tactics = self.query_tactics(obj)
-        tactics.attitude = attitude
-        self.set_tactics(obj, tactics)
+def set_combat_distance(self, obj: MudObject, distance: str):
+    if distance not in self.DISTANCE_OPTIONS:
+        return
+    tactics = self.query_tactics(obj)
+    tactics.ideal_distance = distance
+    self.set_tactics(obj, tactics)
 
     def query_combat_response(self, obj: MudObject) -> str:
         return self.query_tactics(obj).response

@@ -1,3 +1,5 @@
+# Imported to: rooftop.py, room.py
+# Imports from: driver.py
 # /mnt/home2/mud/systems/wall.py
 from typing import List, Optional, Union, Tuple
 from ..driver import driver, MudObject, Player
@@ -122,24 +124,24 @@ class Wall(MudObject):
                     else:
                         self.room.remove_property("here")
 
-    def event_enter(self, thing: MudObject, mess: str, from_room: MudObject):
-        """Handles an object entering the room with the wall."""
-        if not self.room:
-            return
-        self.room.event_enter(thing, mess, from_room)
-        if not thing.query_living() and self.bottom and not self.no_drop:
-            driver.call_out(lambda t=thing: self.fall_down(t), 0)
+    async def event_enter(self, thing: MudObject, mess: str, from_room: MudObject):
+    if not self.room:
+        return
+    await self.room.event_enter(thing, f"{thing.name} scales the wall under Mystra’s gaze.", from_room)
+    if not thing.query_living() and self.bottom and not self.no_drop:
+        driver.call_out(lambda t=thing: self.fall_down(t), 0)
 
-    def fall_down(self, thing: MudObject):
-        """Handles an object falling down the wall."""
-        if not thing or thing.environment() != self.room:
-            return
-        damage = self.room.query_room_size_array()[2]
-        for below in self.belows:
-            below_room = driver.find_object(below)
-            if below_room:
-                below_room.tell_room(f"{thing.a_short()} falls past you and is gone.\n")
-                damage += 2 * below_room.query_room_size_array()[2]
+    async def fall_down(self, thing: MudObject):
+    if not thing or thing.environment() != self.room:
+        return
+    damage = self.room.query_room_size_array()[2]
+    for below in self.belows:
+        below_room = driver.find_object(below)
+        if below_room:
+            await below_room.tell_room(f"{thing.a_short()} falls past in a blur of shadow.\n")
+            damage += 2 * below_room.query_room_size_array()[2]
+    driver.log_file("WALLS", f"{time.ctime()} {thing.name} fell from {self.room.oid}\n")
+    # Rest unchanged, just async-ified
         if isinstance(self.bottom, str):
             if thing.query_living():
                 thing.move_with_look(self.bottom,

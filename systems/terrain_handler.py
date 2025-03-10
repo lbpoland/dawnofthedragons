@@ -1,3 +1,5 @@
+# Imported to: room.py, map_handler.py
+# Imports from: driver.py
 # /mnt/home2/mud/systems/terrain_handler.py
 from typing import Dict, List, Optional, Tuple
 from ..driver import driver, MudObject
@@ -22,15 +24,19 @@ STD_TYPES = {
 }
 
 class TerrainHandler(MudObject):
-    def __init__(self):
-        super().__init__("terrain_handler", "terrain_handler")
-        self.terrain_name: str = ""
-        self.fixed_locations: Dict[str, List[int]] = {}
-        self.floating_locations: List[Tuple[str, List[int], int]] = []
-        self.cloned_locations: Dict[str, Dict[int, Dict[int, Dict[int, str]]]] = {}
-        self.size_cache: Dict[str, int] = {}
-        self.float_cache: Dict[str, Dict[int, Dict[int, Dict[int, str]]]] = {}
-        self.in_map: int = 0
+  def __init__(self):
+    super().__init__("terrain_handler", "terrain_handler")
+    self.terrain_name: str = "faerun"  # Default Forgotten Realms terrain
+    self.fixed_locations: Dict[str, List[int]] = {
+        "/realms/waterdeep/market": [0, 0, 0]  # Example fixed location
+    }
+    self.floating_locations: List[Tuple[str, List[int], int]] = [
+        ("ethereal_veil", [10, 10, 5], 1)  # Example floating
+    ]
+    self.cloned_locations: Dict[str, Dict[int, Dict[int, Dict[int, str]]]] = {}
+    self.size_cache: Dict[str, int] = {}
+    self.float_cache: Dict[str, Dict[int, Dict[int, Dict[int, str]]]] = {}
+    self.in_map: int = 0
 
     def setup(self):
         """Initializes the terrain handler."""
@@ -280,24 +286,23 @@ class TerrainHandler(MudObject):
                         break
 
     def find_location(self, terrain: str, co_ords: List[int]) -> Optional[MudObject]:
-        """Finds or loads a room at the given coordinates."""
-        if not self.get_data_file(terrain) or len(co_ords) != 3:
-            return None
-        dest_name = (self.member_fixed_locations(co_ords) or
-                     self.member_cloned_locations(co_ords) or
-                     self.top_floating_location(co_ords))
-        if not dest_name:
-            return None
-        destination = driver.find_object(dest_name)
-        if not destination and dest_name != "nothing":
-            destination = driver.load_object(dest_name)
-            if not destination and dest_name == self.top_floating_location(co_ords):
-                destination = driver.clone_object(dest_name)
-                destination.set_co_ord(co_ords)
-                destination.set_terrain(terrain)
-                self.calculate_exits(destination, co_ords)
-                self.add_cloned_location(terrain, file_name(destination), co_ords)
-        return destination
+    if not self.get_data_file(terrain) or len(co_ords) != 3:
+        return None
+    dest_name = (self.member_fixed_locations(co_ords) or
+                 self.member_cloned_locations(co_ords) or
+                 self.top_floating_location(co_ords))
+    if not dest_name:
+        return None
+    destination = driver.find_object(dest_name)
+    if not destination and dest_name != "nothing":
+        destination = driver.load_object(dest_name) or driver.clone_object(dest_name)
+        destination.set_co_ord(co_ords)
+        destination.set_terrain(terrain)
+        self.calculate_exits(destination, co_ords)
+        if dest_name in self.floating_locations:
+            self.add_cloned_location(terrain, destination.oid, co_ords)
+        driver.log_file("TERRAIN", f"{time.ctime()} Loaded {dest_name} at {co_ords}\n")
+    return destination
 
     def setup_location(self, place: MudObject, terrain: str):
         """Sets up a fixed location with exits."""

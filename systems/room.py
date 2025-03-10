@@ -1,4 +1,7 @@
 # /mnt/home2/mud/systems/room.py
+# Imported to: rooftop.py, terrain_handler.py, living.py, player.py, object.py
+# Imports from: driver.py, desc.py, extra_look.py, light.py, property.py, export_inventory.py, help_files.py, effects.py, weather_handler.py, situation_changer.py, door.py, terrain_track_handler.py, magic_handler.py
+
 from typing import Dict, List, Optional, Tuple, Union, Callable
 from ..driver import driver, Player, MudObject
 import asyncio
@@ -6,40 +9,22 @@ import math
 import time
 import random
 from . import desc, extra_look, light, property, export_inventory, help_files, effects
+from .weather_handler import WeatherHandler
+from .situation_changer import SituationChanger
+from .door import Door  # Assuming door.py exists
+from .terrain_track_handler import TerrainTrackHandler  # Stubbed if not done
+from .magic_handler import MagicHandler  # Stubbed if not done
 
 # Constants (from includes like room.h, situations.h)
-ENCHANT_HALF = 3600  # From room.h (assumed value for decay half-life)
-ROOM_DEST = 0
-ROOM_EXIT = 1
-ROOM_MESS = 2
-ROOM_OBV = 3
-ROOM_REL = 4
-ROOM_FUNC = 5
-ROOM_SIZE = 6
-ROOM_GRADE = 7
-ROOM_DELTA = 8
-ROOM_LOOK = 9
-ROOM_LOOK_FUNC = 10
-ROOM_LINK_MESS = 11
-ROOM_DEFAULT_INDEX = 0
-ROOM_DAY_INDEX = 1
-ROOM_NIGHT_INDEX = 2
+ENCHANT_HALF = 3600
+ROOM_DEST, ROOM_EXIT, ROOM_MESS, ROOM_OBV, ROOM_REL, ROOM_FUNC, ROOM_SIZE, ROOM_GRADE, ROOM_DELTA, ROOM_LOOK, ROOM_LOOK_FUNC, ROOM_LINK_MESS = range(12)
+ROOM_DEFAULT_INDEX, ROOM_DAY_INDEX, ROOM_NIGHT_INDEX = 0, 1, 2
 ROOM_VOID = "/room/void"
-SHORTEN = {
-    "north": "n", "northeast": "ne", "east": "e", "southeast": "se",
-    "south": "s", "southwest": "sw", "west": "w", "northwest": "nw",
-    "up": "u", "down": "d"
-}
-STD_ORDERS = [
-    "north", [0, 1, 0], "northeast", [1, 1, 0], "east", [1, 0, 0],
-    "southeast", [1, -1, 0], "south", [0, -1, 0], "southwest", [-1, -1, 0],
-    "west", [-1, 0, 0], "northwest", [-1, 1, 0], "up", [0, 0, 1],
-    "down", [0, 0, -1]
-]
-WHEN_ANY_TIME = 0xFFFFFF  # From situations.h (assumed all hours)
+SHORTEN = {"north": "n", "northeast": "ne", "east": "e", "southeast": "se", "south": "s", "southwest": "sw", "west": "w", "northwest": "nw", "up": "u", "down": "d"}
+STD_ORDERS = ["north", [0, 1, 0], "northeast", [1, 1, 0], "east", [1, 0, 0], "southeast", [1, -1, 0], "south", [0, -1, 0], "southwest", [-1, -1, 0], "west", [-1, 0, 0], "northwest", [-1, 1, 0], "up", [0, 0, 1], "down", [0, 0, -1]]
+WHEN_ANY_TIME = 0xFFFFFF
 
-class Room(MudObject, desc.Desc, extra_look.ExtraLook, light.Light, property.Property,
-           export_inventory.ExportInventory, help_files.HelpFiles, effects.Effects):
+class Room(MudObject, desc.Desc, extra_look.ExtraLook, light.Light, property.Property, export_inventory.ExportInventory, help_files.HelpFiles, effects.Effects):
     def __init__(self, oid: str, name: str):
         super().__init__(oid, name)
         self.do_setup: bool = False
@@ -48,18 +33,19 @@ class Room(MudObject, desc.Desc, extra_look.ExtraLook, light.Light, property.Pro
         self.long_exit: Optional[str] = None
         self.long_exit_mxp: Optional[str] = None
         self.short_exit: Optional[str] = None
-        self.theft_handler: Optional[str] = None
+        self.theft_handler: Optional[str] = "/obj/handlers/theft_handler"
         self.aliases: List[str] = []
         self._exits: List[str] = []
         self.item: Optional[MudObject] = None
         self.chatter: Optional[MudObject] = None
-        self.sitchanger: Optional[MudObject] = None
+        self.sitchanger: Optional[SituationChanger] = None
         self.linker: Optional[MudObject] = None
         self.terrain: Optional[MudObject] = None
         self.wall: Optional[MudObject] = None
+        self.rooftop: Optional[MudObject] = None
         self.hidden_objects: List[MudObject] = []
         self._use_internal_objects: List[MudObject] = []
-        self.door_control: Dict[str, Union[str, MudObject]] = {}
+        self.door_control: Dict[str, Union[str, Door]] = {}
         self.dest_other: List[Union[str, List]] = []
         self.enchant_time: int = time.time()
         self.background_enchant: int = 0
@@ -70,17 +56,52 @@ class Room(MudObject, desc.Desc, extra_look.ExtraLook, light.Light, property.Pro
         self.variableitems: Optional[List[List]] = None
         self.is_day: int = -1
         self.not_replaceable: bool = False
+        self.weather_handler = WeatherHandler() if not hasattr(driver, "weather_handler") else driver.weather_handler
+        self.tent_owner: Optional[str] = None
+        self.tent_decay: int = 0
+        self.magic_aura: int = 0  # New: Ambient magic level
+        self.track_handler = TerrainTrackHandler()  # Stubbed
+        self.magic_handler = MagicHandler()  # Stubbed
         self.attrs["location"] = "inside"
-        self.attrs["here"] = "on the floor"
+        self.attrs["here"] = "on the ground"
+        self.attrs["arcane_resonance"] = 0  # FR-specific enchantment
         if not self.do_setup:
             self.setup()
             self.reset()
+        asyncio.create_task(self.room_loop())
+
+    async def room_loop(self):
+        """Continuous room update loop."""
+        while True:
+            await asyncio.sleep(60)
+            await self.update_weather()
+            await self.check_tent()
+            self.check_magic_aura()
+            if self.sitchanger:
+                self.sitchanger.check_situations()
+
+    async def update_weather(self):
+        """Updates weather effects with temperature and afflictions."""
+        if self.attrs["location"] == "outside":
+            temp = self.weather_handler.query_temperature(self.oid)
+            if temp > 90:
+                await self.tell_room("The air shimmers with oppressive heat.\n")
+                self.add_effect("heatstroke", 300)
+            elif temp < 32:
+                await self.tell_room("A biting chill seeps into the air.\n")
+                self.add_effect("hypothermia", 300)
+
+    def check_magic_aura(self):
+        """Updates ambient magic aura."""
+        self.magic_aura = min(self.magic_aura + random.randint(-5, 5), 100)
+        if self.magic_aura > 75:
+            self.add_extra_look("A wild surge of Netherese energy crackles faintly.\n")
 
     def query_is_room(self) -> bool:
         return True
 
     def query_enchant(self) -> int:
-        enchant_level = int(0.5 + self.dynamic_enchant * math.exp(-0.693 * (time.time() - self.enchant_time) / ENCHANT_HALF) + self.background_enchant)
+        enchant_level = int(0.5 + self.dynamic_enchant * math.exp(-0.693 * (time.time() - self.enchant_time) / ENCHANT_HALF) + self.background_enchant + self.attrs["arcane_resonance"])
         return min(enchant_level, 5000)
 
     def set_enchant(self, number: int) -> int:
@@ -117,14 +138,12 @@ class Room(MudObject, desc.Desc, extra_look.ExtraLook, light.Light, property.Pro
         return self.co_ord.copy() if self.co_ord else None
 
     def set_co_ord(self, new_co_ord: List[int]):
-        if not isinstance(new_co_ord, list):
-            print("Warning: Co-ordinate must be an array.")
-            return
-        if len(new_co_ord) != 3:
-            print("Warning: The co-ordinate must have three elements.")
+        if not isinstance(new_co_ord, list) or len(new_co_ord) != 3:
+            print("Warning: Co-ordinate must be a 3-element array.")
             return
         self.co_ord = new_co_ord
         self.co_ord_calculated = driver.previous_object() != self
+        self.track_handler.update_position(self.oid, new_co_ord)
 
     def flush_co_ord(self):
         self.co_ord = None
@@ -156,7 +175,7 @@ class Room(MudObject, desc.Desc, extra_look.ExtraLook, light.Light, property.Pro
                 words.append(f"$R$-{self.dest_other[i]}$R$" if self.dest_other[i + 1][ROOM_REL] else self.dest_other[i])
         if not words:
             self.long_exit = "There are no obvious exits."
-            self.long_exit_mxp = "There are no obvious exits."  # Simplified MXP handling
+            self.long_exit_mxp = "There are no obvious exits."
         elif len(words) == 1:
             self.long_exit = f"There is one obvious exit: {words[0]}."
             self.long_exit_mxp = f"There is one obvious exit: {words[0]}."
@@ -209,7 +228,7 @@ class Room(MudObject, desc.Desc, extra_look.ExtraLook, light.Light, property.Pro
     def query_chatter(self) -> Optional[MudObject]:
         return self.chatter
 
-    def query_situation_changer(self) -> Optional[MudObject]:
+    def query_situation_changer(self) -> Optional[SituationChanger]:
         return self.sitchanger
 
     def query_linker(self) -> Optional[MudObject]:
@@ -247,7 +266,7 @@ class Room(MudObject, desc.Desc, extra_look.ExtraLook, light.Light, property.Pro
     def query_use_internal_objects(self) -> List[MudObject]:
         return self._use_internal_objects.copy()
 
-    def query_door_control(self, direc: str = None, name: str = None) -> Union[Dict, Optional[Union[str, MudObject]]]:
+    def query_door_control(self, direc: str = None, name: str = None) -> Union[Dict, Optional[Union[str, Door]]]:
         if not direc:
             return self.door_control.copy()
         key = f"{direc} {name}" if name else direc
@@ -307,13 +326,13 @@ class Room(MudObject, desc.Desc, extra_look.ExtraLook, light.Light, property.Pro
         return 15
 
     def query_dark_mess(self) -> str:
-        return self.attrs.get("dark mess", "It's dark here, isn't it?")
+        return self.attrs.get("dark mess", "Darkness cloaks this place in shadow.\n")
 
     def set_dark_mess(self, word: str):
         self.attrs["dark mess"] = word
 
     def query_bright_mess(self) -> str:
-        return self.attrs.get("bright mess", "It's too bright to see anything!")
+        return self.attrs.get("bright mess", "Blinding light obscures all detail!\n")
 
     def set_bright_mess(self, word: str):
         self.attrs["bright mess"] = word
@@ -376,7 +395,7 @@ class Room(MudObject, desc.Desc, extra_look.ExtraLook, light.Light, property.Pro
 
     def query_short_exit_string(self) -> str:
         if self.short_exit:
-            return f"\033[32m{self.short_exit}\033[0m"  # Simplified color handling
+            return f"\033[32m{self.short_exit}\033[0m"
         tmp = self.calc_short_exit_string()
         if not self.attrs.get("no exit cache"):
             self.short_exit = tmp
@@ -390,21 +409,19 @@ class Room(MudObject, desc.Desc, extra_look.ExtraLook, light.Light, property.Pro
         if 0 <= enchant <= 49:
             return ""
         elif 50 <= enchant <= 149:
-            return "There is the residual taste of magic in this place.\n"
+            return "A subtle hum of the Ethereal Veil brushes this place.\n"
         elif 150 <= enchant <= 299:
-            return "This place has seen some use of magic.\n"
+            return "Faint tendrils of Netherese sorcery coil through the air.\n"
         elif 300 <= enchant <= 499:
-            return "A considerable amount of magic has been used here.\n"
+            return "The Ethereal Veil pulses, alive with arcane whispers.\n"
         elif 500 <= enchant <= 749:
-            return "A very large quantity of magic has been manipulated here.\n"
+            return "A surge of ancient power crackles, echoing lost Netheril.\n"
         elif 750 <= enchant <= 1000:
-            return "You can feel the Forgotten Realms' Weave straining here.\n"  # Adapted for Forgotten Realms
+            return "The Veil bends, shimmering with forbidden magic.\n"
         elif 1001 <= enchant <= 1500:
-            return "Little sparks of arcane energy flicker around you.\n"
-        elif 1501 <= enchant <= 2000:
-            return "Visions of creatures from the Far Realm haunt your periphery.\n"
+            return "Ethereal runes flare, hinting at secrets of the Mythal.\n"
         else:
-            return "So much magic has been expended here that the Weave risks unraveling.\n"
+            return "Raw arcane torrents roar, threatening to tear reality asunder!\n"
 
     async def long(self, word: str = "", dark: int = 0) -> str:
         if not self.long_exit:
@@ -416,23 +433,29 @@ class Room(MudObject, desc.Desc, extra_look.ExtraLook, light.Light, property.Pro
             else:
                 ret = f"{self.query_bright_mess()}\n"
             if self.attrs.get("location") == "outside":
-                ret += "$weather$"
+                ret += f"{self.weather_handler.query_weather(self.oid)}\n"
             if dark in [1, -1]:
                 ret = f"$C${self.a_short()}.  {ret}\033[32m{self.long_exit}\033[0m\n"
                 if self.query_contents("") != "":
-                    ret += "Some objects you can't make out are here.\n"
+                    ret += "Shadows conceal objects in the gloom.\n"
         else:
             ret = "$long$" if self.attrs.get("location") == "outside" else self.query_long()
             if not ret:
-                ret = "Erk, this room seems to be broken.\n"
+                ret = "Ancient arcane currents have faded here—report this to a sage of Candlekeep.\n"
             extra = self.calc_extra_look()
             if extra:
                 ret += extra
-            if driver.this_player() and driver.this_player().attrs.get("see_octarine", False):
+            if driver.this_player() and driver.this_player().attrs.get("see_ether", False):  # Updated from see_octarine
                 ret += self.enchant_string()
             if self.attrs.get("location") == "outside":
-                ret += "$weather$"
+                ret += f"{self.weather_handler.query_weather(self.oid)}\n"
+                if driver.this_player() and driver.this_player().attrs.get("terrain_map_in_look", 0):
+                    ret += f"\n{driver.map_handler.query_player_map_template(self.co_ord[0], self.co_ord[1], self.co_ord[2], self.query_light(), 5)}\n"
             ret += f"\033[32m{self.long_exit}\033[0m\n{self.query_contents('')}"
+            if self.rooftop:
+                ret += "A jagged rooftop pierces the sky, whispering of Netherese ambition.\n"
+            if self.tent_owner:
+                ret += f"A tent of woven shadowsilk, pitched by {self.tent_owner}, stands resilient for {self.tent_decay} days.\n"
         if self.attrs.get("no exit cache"):
             self.long_exit = None
         return ret
@@ -518,7 +541,7 @@ class Room(MudObject, desc.Desc, extra_look.ExtraLook, light.Light, property.Pro
             self.last_visited = time.time()
 
         if self.is_day != -1:
-            new_day = driver.weather_handler.query_day() > 0
+            new_day = self.weather_handler.query_day() > 0
             if new_day != self.is_day:
                 self.is_day = new_day
                 if self.variablelongs and self.variablelongs[self.is_day]:
@@ -555,6 +578,19 @@ class Room(MudObject, desc.Desc, extra_look.ExtraLook, light.Light, property.Pro
         if self.item:
             self.item.init()
 
+        if self.tent_owner and time.time() - self.last_visited > 86400:
+            self.tent_decay -= 1
+            if self.tent_decay <= 0:
+                self.tent_owner = None
+                self.set_keep_room_loaded(0)
+                await self.tell_room(f"The shadowsilk tent collapses into ethereal dust.\n")
+
+    async def tell_room(self, message: str):
+        """Broadcasts message to all players in the room."""
+        for obj in self.inventory:
+            if obj.attrs.get("player", False):
+                await obj.send(message)
+
     def query_zones(self) -> List[str]:
         zones = self.attrs.get("room zone", [])
         return zones if zones else ["nowhere"]
@@ -568,7 +604,7 @@ class Room(MudObject, desc.Desc, extra_look.ExtraLook, light.Light, property.Pro
         zones = self.attrs.get("room zone", [])
         if zone in zones:
             zones.remove(zone)
-            self.attrs["room zone"] = zones
+        self.attrs["room zone"] = zones
 
     def set_zone(self, zone: str):
         self.add_zone(zone)
@@ -583,11 +619,11 @@ class Room(MudObject, desc.Desc, extra_look.ExtraLook, light.Light, property.Pro
             dest = dest.oid
         if not dest.startswith("/"):
             dest = f"/{dest}"
-        stuff = [dest] + driver.room_handler.query_exit_type(type, direc)
+        stuff = [dest] + driver.room_handler.query_exit_type(type, direc) if hasattr(driver, "room_handler") else [dest, None, None, 1, False, None, 0, 0, None, None, None, None]
         self.dest_other.extend([direc, stuff])
-        door_stuff = driver.room_handler.query_door_type(type, direc, dest)
+        door_stuff = driver.room_handler.query_door_type(type, direc, dest) if hasattr(driver, "room_handler") else None
         if door_stuff:
-            door = MudObject(f"door_{direc}", "door")
+            door = Door(f"door_{direc}", "door")
             door.setup_door(direc, self, dest, door_stuff, type)
             self.door_control[direc] = door
             self.hidden_objects.append(door)
@@ -626,12 +662,11 @@ class Room(MudObject, desc.Desc, extra_look.ExtraLook, light.Light, property.Pro
                 self.dest_other[i + 1][ROOM_SIZE] = data[j + 1]
             elif key == "upgrade":
                 self.dest_other[i + 1][ROOM_GRADE] = data[j + 1]
-            # Add more cases as needed from truncated code
         return 1
 
     def query_door_open(self, direc: str) -> int:
         door = self.door_control.get(direc)
-        if not isinstance(door, MudObject):
+        if not isinstance(door, Door):
             return -1
         return door.query_open()
 
@@ -664,6 +699,7 @@ class Room(MudObject, desc.Desc, extra_look.ExtraLook, light.Light, property.Pro
 
     def event_magic(self, channel: MudObject, amount: int, caster: MudObject):
         self.add_enchant(amount // 5)
+        self.magic_aura += amount // 10
 
     def event_theft(self, command_ob: MudObject, thief: MudObject, victim: MudObject, stolen: List[MudObject]):
         if thief.attrs.get("caster"):
@@ -717,6 +753,30 @@ class Room(MudObject, desc.Desc, extra_look.ExtraLook, light.Light, property.Pro
             self.wall = MudObject(f"wall_{self.oid}", "wall")
             self.wall.setup_shadow(self)
         self.wall.set_wall(args)
+
+    def set_rooftop(self):
+        if not self.rooftop:
+            self.rooftop = driver.clone_object("/systems/rooftop")
+            self.rooftop.setup_shadow(self)
+
+    def add_tent(self, owner: str, duration: int = 7) -> bool:
+        if self.tent_owner:
+            return False
+        self.tent_owner = owner
+        self.tent_decay = duration
+        self.set_keep_room_loaded(1)
+        self.add_item("tent", f"A shadowsilk tent pitched by {owner}, woven with protective runes.", True)
+        driver.call_out(self.check_tent, 86400)
+        return True
+
+    async def check_tent(self):
+        if self.tent_owner and time.time() - self.last_visited > 86400:
+            self.tent_decay -= 1
+            if self.tent_decay <= 0:
+                self.tent_owner = None
+                self.set_keep_room_loaded(0)
+                self.remove_item("tent")
+                await self.tell_room(f"The shadowsilk tent collapses into ethereal dust.\n")
 
     def set_default_position(self, stuff: Union[str, List, Callable]):
         self.attrs["default_position"] = stuff
@@ -825,12 +885,12 @@ class Room(MudObject, desc.Desc, extra_look.ExtraLook, light.Light, property.Pro
 
     def tell_door(self, direc: str, message: str, thing: MudObject):
         door = self.door_control.get(direc)
-        if isinstance(door, MudObject):
+        if isinstance(door, Door):
             door.tell_door(message, thing)
 
     def call_door(self, direc: str, func: str, *args) -> Optional[Union[int, str]]:
         door = self.door_control.get(direc)
-        if isinstance(door, MudObject):
+        if isinstance(door, Door):
             return getattr(door, func)(*args)
         return None
 
@@ -845,9 +905,9 @@ class Room(MudObject, desc.Desc, extra_look.ExtraLook, light.Light, property.Pro
         if not direc:
             return None
         door = self.door_control.get(direc)
-        if isinstance(door, MudObject):
+        if isinstance(door, Door):
             return direc
-        door = MudObject(f"door_{direc}", "door")
+        door = Door(f"door_{direc}", "door")
         i = self.dest_other.index(direc)
         door.setup_door(direc, self, dest, self.dest_other[i + 1])
         self.hidden_objects.append(door)
@@ -877,13 +937,13 @@ class Room(MudObject, desc.Desc, extra_look.ExtraLook, light.Light, property.Pro
         if not self.chatter:
             self.chatter = MudObject(f"chatter_{self.oid}", "chatter")
         if self.is_day == -1:
-            self.is_day = driver.weather_handler.query_day() > 0
+            self.is_day = self.weather_handler.query_day() > 0
         chats = (self.variablechats[self.is_day] if self.is_day else self.variablechats[ROOM_NIGHT_INDEX]) if self.variablechats else None
         if not chats:
             chats = self.variablechats[ROOM_DEFAULT_INDEX] if self.variablechats else None
         elif self.variablechats and self.variablechats[ROOM_DEFAULT_INDEX]:
             chats[2].extend(self.variablechats[ROOM_DEFAULT_INDEX][2])
-        if chats:
+        if chats and driver.this_player() and driver.this_player().attrs.get("chat_output", True):
             self.chatter.setup_chatter(self, chats)
 
     def room_chat(self, args: List, chatobj: MudObject = None):
@@ -897,18 +957,18 @@ class Room(MudObject, desc.Desc, extra_look.ExtraLook, light.Light, property.Pro
         self.variablechats[ROOM_DEFAULT_INDEX] = args
         self.setup_room_chat()
 
-    def set_situation_changer(self, changer: Union[str, MudObject] = None) -> MudObject:
+    def set_situation_changer(self, changer: Union[str, SituationChanger] = None) -> SituationChanger:
         if isinstance(changer, str):
-            self.sitchanger = MudObject(f"sitchanger_{self.oid}", changer)
-        elif isinstance(changer, MudObject):
+            self.sitchanger = SituationChanger(f"sitchanger_{self.oid}", changer)
+        elif isinstance(changer, SituationChanger):
             self.sitchanger = changer
         else:
-            self.sitchanger = MudObject(f"sitchanger_{self.oid}", "situation_changer")
+            self.sitchanger = SituationChanger(f"sitchanger_{self.oid}", "situation_changer")
         return self.sitchanger.set_room(self)
 
     def add_situation(self, label: Union[str, int], sit: dict):
         if not self.sitchanger:
-            self.sitchanger = MudObject(f"sitchanger_{self.oid}", "situation_changer")
+            self.sitchanger = SituationChanger(f"sitchanger_{self.oid}", "situation_changer")
             self.sitchanger.set_room(self)
         self.sitchanger.add_situation(label, sit)
 
@@ -918,7 +978,7 @@ class Room(MudObject, desc.Desc, extra_look.ExtraLook, light.Light, property.Pro
 
     def start_situation(self, label: int, do_start_mess: int):
         if self.sitchanger:
-            self.sitchanger.start_situation(label, do_start_mess)
+            asyncio.create_task(self.sitchanger.start_situation(label, do_start_mess))
 
     def end_situation(self, label: Union[str, int]):
         if self.sitchanger:
@@ -959,14 +1019,15 @@ class Room(MudObject, desc.Desc, extra_look.ExtraLook, light.Light, property.Pro
                  ("background enchantment", self.background_enchant),
                  ("dynamic enchantment", self.dynamic_enchant),
                  ("enchantment time", self.enchant_time),
-                 ("theft handler", self.theft_handler)])
+                 ("theft handler", self.theft_handler),
+                 ("magic aura", self.magic_aura)])
 
     def set_day_long(self, str: str):
         if not self.variablelongs:
             self.variablelongs = [""] * 2
         self.variablelongs[ROOM_DAY_INDEX] = str
         if self.is_day == -1:
-            self.is_day = driver.weather_handler.query_day() > 0
+            self.is_day = self.weather_handler.query_day() > 0
         if self.is_day == ROOM_DAY_INDEX:
             self.set_long(str)
 
@@ -980,7 +1041,7 @@ class Room(MudObject, desc.Desc, extra_look.ExtraLook, light.Light, property.Pro
             self.variablelongs = [""] * 2
         self.variablelongs[ROOM_NIGHT_INDEX] = str
         if self.is_day == -1:
-            self.is_day = driver.weather_handler.query_day() > 0
+            self.is_day = self.weather_handler.query_day() > 0
         if self.is_day == ROOM_NIGHT_INDEX:
             self.set_long(str)
 
@@ -1001,7 +1062,7 @@ class Room(MudObject, desc.Desc, extra_look.ExtraLook, light.Light, property.Pro
             self.variableitems = [[], []]
         self.variableitems[ROOM_DAY_INDEX].extend([the_item, self.return_long(desc)])
         if self.is_day == -1:
-            self.is_day = driver.weather_handler.query_day() > 0
+            self.is_day = self.weather_handler.query_day() > 0
         if self.is_day == ROOM_DAY_INDEX:
             return self.add_item(shorts, desc, no_plural)
         return True
@@ -1012,7 +1073,7 @@ class Room(MudObject, desc.Desc, extra_look.ExtraLook, light.Light, property.Pro
             self.variableitems = [[], []]
         self.variableitems[ROOM_NIGHT_INDEX].extend([the_item, self.return_long(desc)])
         if self.is_day == -1:
-            self.is_day = driver.weather_handler.query_day() > 0
+            self.is_day = self.weather_handler.query_day() > 0
         if self.is_day == ROOM_NIGHT_INDEX:
             return self.add_item(shorts, desc, no_plural)
         return True
@@ -1022,7 +1083,7 @@ class Room(MudObject, desc.Desc, extra_look.ExtraLook, light.Light, property.Pro
             self.variablechats = [None] * 3
         self.variablechats[ROOM_DAY_INDEX] = args
         if self.is_day == -1:
-            self.is_day = driver.weather_handler.query_day() > 0
+            self.is_day = self.weather_handler.query_day() > 0
         if self.is_day == ROOM_DAY_INDEX:
             self.setup_room_chat()
 
@@ -1031,7 +1092,7 @@ class Room(MudObject, desc.Desc, extra_look.ExtraLook, light.Light, property.Pro
             self.variablechats = [None] * 3
         self.variablechats[ROOM_NIGHT_INDEX] = args
         if self.is_day == -1:
-            self.is_day = driver.weather_handler.query_day() > 0
+            self.is_day = self.weather_handler.query_day() > 0
         if self.is_day == ROOM_NIGHT_INDEX:
             self.setup_room_chat()
 
@@ -1053,5 +1114,15 @@ class Room(MudObject, desc.Desc, extra_look.ExtraLook, light.Light, property.Pro
     def query_night_items(self) -> List:
         return self.variableitems[ROOM_NIGHT_INDEX] if self.variableitems else []
 
+    async def move(self, dest: str | MudObject, messin: str = "", messout: str = "") -> int:
+        if isinstance(dest, str):
+            dest = driver.load_object(dest)
+        if not dest:
+            return -1  # MOVE_INVALID_DEST
+        return await driver.move_object(self, dest, messin, messout)
+
 async def init(driver_instance):
+    global driver
     driver = driver_instance
+    room = Room("room_void", "The Void")
+    driver.add_object(room)

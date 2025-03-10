@@ -1,3 +1,5 @@
+# Imported to: rooftop.py, combat.py
+# Imports from: driver.py
 # /mnt/home2/mud/systems/taskmaster.py
 from typing import Dict, Optional, Tuple, ClassVar
 from ..driver import driver, Player, MudObject
@@ -35,16 +37,16 @@ class Taskmaster:
     TASKER_MARGINAL_UPPER = 10
     TASKER_NORMAL_UPPER = 30
 
-    # Skill categories and caps (from wiki and mudlib context)
     SKILL_CATEGORIES: ClassVar[Dict[str, int]] = {
-        "fighting.combat.melee": 300,
-        "fighting.combat.dodge": 300,
-        "fighting.combat.parry": 300,
-        "fighting.combat.unarmed": 300,
-        "fighting.combat.tactics": 300,
-        "other.perception": 200,
-        "magic.spellcasting": 250  # Forgotten Realms adaptation
-    }
+    "fighting.combat.melee": 300,
+    "fighting.combat.dodge": 300,
+    "fighting.combat.parry": 300,
+    "fighting.combat.unarmed": 300,
+    "fighting.combat.tactics": 300,
+    "other.perception": 200,
+    "magic.spellcasting": 250,
+    "faith.devotion": 200  # 2025 Forgotten Realms addition
+}
 
     BASE = 100  # Base skill level for exponential decay (inferred)
     DECAY = 50  # Decay constant for upper limit (inferred)

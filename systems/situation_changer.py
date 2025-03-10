@@ -1,11 +1,14 @@
 # /mnt/home2/mud/systems/situation_changer.py
+# Imported to: room.py
+# Imports from: driver.py
+
 from typing import Dict, List, Optional, Union, Callable
 from ..driver import driver, MudObject
 import asyncio
 import random
 import time
 
-# Constants from situations.h
+# Constants from situations.h (unchanged)
 WHEN_ANY_TIME = 0xFFFFFF
 WHEN_WEE_HOURS = 0x000001  # 1 AM
 WHEN_EARLY_MORNING = 0x00001E  # 5-6 AM
@@ -18,13 +21,13 @@ class Situation:
     def __init__(self):
         self.start_func: Optional[Callable] = None
         self.end_func: Optional[Callable] = None
-        self.start_mess: str = ""
-        self.end_mess: str = ""
-        self.extra_look: str = ""
-        self.chat_rate: List[int] = [120, 240]
-        self.chats: List[str] = []
-        self.add_items: List[Tuple] = []
-        self.random_words: List[List[str]] = []
+        self.start_mess: str = "A ripple of arcane energy heralds the Ethereal Veil’s stirring.\n"
+        self.end_mess: str = "The Ethereal Veil fades, leaving only echoes of its power.\n"
+        self.extra_look: str = "Shimmering motes of Netherese magic drift lazily in the air.\n"
+        self.chat_rate: List[int] = [60, 120]  # Faster for 2025 responsiveness
+        self.chats: List[str] = ["A faint hum of ancient sorcery reverberates nearby."]
+        self.add_items: List[Tuple] = [("rune", "A carved rune glows with eldritch light.")]
+        self.random_words: List[List[str]] = [["foe", "ally"]]  # Example for substitution
 
 class SituationChanger(MudObject):
     def __init__(self, oid: str, name: str):
@@ -48,15 +51,16 @@ class SituationChanger(MudObject):
         """Adds a situation to the changer."""
         self.situations[label] = sit
 
-    def start_situation(self, label: Union[str, int], do_start_mess: int):
+    async def start_situation(self, label: Union[str, int], do_start_mess: int):
         """Starts a specified situation."""
         if label not in self.situations or label in self.active_situations:
             return
         sit = self.situations[label]
         if sit.start_func:
             sit.start_func(label, do_start_mess, self.room)
-        if do_start_mess and sit.start_mess:
-            self.room.tell_room(sit.start_mess)
+        if do_start_mess and sit.start_mess and self.room:
+            await self.room.tell_room(sit.start_mess)
+            driver.log_file("SITUATIONS", f"{time.ctime()} {label} started in {self.room.oid}\n")
         if sit.extra_look:
             self.room.add_extra_look(sit.extra_look)
         if sit.chats:
@@ -74,7 +78,7 @@ class SituationChanger(MudObject):
         sit = self.situations[label]
         if sit.end_func:
             sit.end_func(label, self.room)
-        if sit.end_mess:
+        if sit.end_mess and self.room:
             self.room.tell_room(sit.end_mess)
         if sit.extra_look:
             self.room.remove_extra_look(sit.extra_look)
@@ -115,7 +119,7 @@ class SituationChanger(MudObject):
                     for j, (item, desc) in enumerate(sit.add_items):
                         sit.add_items[j] = (item, desc.replace(f"#{i+1}", replacement))
                     sit.chats = [c.replace(f"#{i+1}", replacement) for c in sit.chats]
-        self.start_situation(label, 1)
+        asyncio.create_task(self.start_situation(label, 1))
         if index + 1 < len(labels) and durations[index] > 0:
             driver.call_out(self._handle_situation_change, durations[index], labels, durations, words, index + 1)
 
@@ -153,7 +157,7 @@ class SituationChanger(MudObject):
             return
         hour = time.localtime().tm_hour
         if (1 << hour) & config["when"] and random.randint(0, 1000) < config["chance"]:
-            if not any(s["category"] == config["category"] for s in self.active_situations.values()):
+            if not any(s.get("category") == config["category"] for s in self.active_situations.values()):
                 self.change_situation(label, config["duration"])
         config["last_check"] = time.time()
         driver.call_out(self._check_automated_situation, 60, label)
@@ -177,7 +181,8 @@ class SituationChanger(MudObject):
     def check_situations(self):
         """Checks and updates active situations."""
         for label, data in list(self.active_situations.items()):
-            if time.time() - data["start_time"] >= sum(d for d in self.situations[label].chat_rate if d > 0):
+            sit = self.situations[label]
+            if time.time() - data["start_time"] >= sum(d for d in sit.chat_rate if d > 0):
                 self.end_situation(label)
 
     def dest_me(self):

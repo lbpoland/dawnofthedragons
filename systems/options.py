@@ -1,3 +1,5 @@
+# Imported to: living.py, tactics.py
+# Imports from: driver.py, tactics.py
 # /mnt/home2/mud/systems/options.py
 from typing import Dict, Optional, List, Callable, Tuple, ClassVar
 from ..driver import driver, Player, MudObject
@@ -23,6 +25,7 @@ class player_options_control:
         self.mxp_disable = 0
 
 # Option type constants (from /include/options.h)
+OPTIONS_TYPE_FAITH = 10  # For deity-related options
 OPTIONS_TYPE_BRIEF = 1
 OPTIONS_TYPE_BOOLEAN = 2
 OPTIONS_TYPE_INTEGER = 3
@@ -56,131 +59,136 @@ class OptionsHandler:
                 obj.add_action("options", self.options_command)
 
     def create(self):
-        self._options = {}
-        self._cache_input = {}
+    self._options = {}
+    self._cache_input = {}
 
-        # Output options
-        self.add_option("output look", OPTIONS_TYPE_BRIEF, OPTIONS_TYPE_ALL,
-                       lambda p, v: self.set_verbose(p, "look", v), lambda p: self.query_verbose(p, "look"),
-                       "Display room descriptions briefly or in full")
-        self.add_option("output combat", OPTIONS_TYPE_BRIEF, OPTIONS_TYPE_ALL,
-                       lambda p, v: self.set_verbose(p, "combat", v), lambda p: self.query_verbose(p, "combat"),
-                       "Display all combat messages or only those involving damage")
-        self.add_option("output errors", OPTIONS_TYPE_BRIEF, OPTIONS_TYPE_CRE_ONLY,
-                       lambda p, v: self.set_verbose(p, "errors", v), lambda p: self.query_verbose(p, "errors"),
-                       "Display errors in the error handler briefly")
-        self.add_option("output score", OPTIONS_TYPE_BRIEF, OPTIONS_TYPE_ALL,
-                       lambda p, v: self.set_verbose(p, "score", v), lambda p: self.query_verbose(p, "score"),
-                       "Amount of detail to be displayed by the 'score' command")
-        self.add_option("output accent", ["mangle", "unadulterated"], OPTIONS_TYPE_ALL,
-                       lambda p, v: p.attrs["mangle_accent"] == (v == "mangle"), lambda p: p.attrs.get("mangle_accent", False) and "mangle" or "unadulterated",
-                       "Show others speech with or without regional accents")
-        self.add_option("output names", OPTIONS_TYPE_BRIEF, OPTIONS_TYPE_ALL,
-                       lambda p, v: self.set_verbose(p, "names", v), lambda p: self.query_verbose(p, "names"),
-                       "Display player names with or without title and surname")
-        self.add_option("output htell", OPTIONS_TYPE_BRIEF, OPTIONS_TYPE_ALL,
-                       lambda p, v: self.set_verbose(p, "htell", v), lambda p: self.query_verbose(p, "htell"),
-                       "Cause the 'htell' command to display times for tells or not")
-        self.add_option("output msgout", OPTIONS_TYPE_STRING, OPTIONS_TYPE_CRE_ONLY,
-                       lambda p, v: setattr(p.attrs, "msgout", v), lambda p: p.attrs.get("msgout", ""),
-                       "The message that is displayed when you walk out of a room")
-        self.add_option("output msgin", OPTIONS_TYPE_STRING, OPTIONS_TYPE_CRE_ONLY,
-                       lambda p, v: setattr(p.attrs, "msgin", v), lambda p: p.attrs.get("msgin", ""),
-                       "The message that is displayed when you walk into a room")
-        self.add_option("output mmsgout", OPTIONS_TYPE_STRING, OPTIONS_TYPE_CRE_ONLY,
-                       lambda p, v: setattr(p.attrs, "mmsgout", v), lambda p: p.attrs.get("mmsgout", ""),
-                       "The message that is displayed when you trans out of a room")
-        self.add_option("output mmsgin", OPTIONS_TYPE_STRING, OPTIONS_TYPE_CRE_ONLY,
-                       lambda p, v: setattr(p.attrs, "mmsgin", v), lambda p: p.attrs.get("mmsgin", ""),
-                       "The message that is displayed when you trans into a room")
-        self.add_option("output usercolour", OPTIONS_TYPE_BOOLEAN, OPTIONS_TYPE_ALL,
-                       lambda p, v: p.attrs.setdefault("allow_coloured_souls", v), lambda p: p.attrs.get("allow_coloured_souls", 0),
-                       "Display user chosen colours in souls")
-        self.add_option("output plainmaps", OPTIONS_TYPE_BOOLEAN, OPTIONS_TYPE_ALL,
-                       lambda p, v: p.attrs.setdefault("plain_maps", v), lambda p: p.attrs.get("plain_maps", 0),
-                       "Display terrain maps without colour")
-        self.add_option("output lookmap", OPTIONS_TYPE_BOOLEAN, OPTIONS_TYPE_PLAYTESTER_ONLY,
-                       lambda p, v: p.attrs.setdefault("terrain_map_in_look", v), lambda p: p.attrs.get("terrain_map_in_look", 0),
-                       "Display room a map in the terrain long or not")
-        self.add_option("output tabstops", OPTIONS_TYPE_INTEGER, OPTIONS_TYPE_CRE_ONLY,
-                       lambda p, v: p.attrs.setdefault("tabstops", v), lambda p: p.attrs.get("tabstops", 0),
-                       "Show tabstops as <TAB> or as spaces")
-        self.add_option("output shorthand", OPTIONS_TYPE_BOOLEAN, OPTIONS_TYPE_ALL,
-                       lambda p, v: p.attrs.setdefault("shorthand_output", v), lambda p: p.attrs.get("shorthand_output", 0),
-                       "Convert others shorthand text into long form")
+    # Output options (updated with 2025 verbosity levels)
+    self.add_option("output look", OPTIONS_TYPE_BRIEF, OPTIONS_TYPE_ALL,
+                   lambda p, v: self.set_verbose(p, "look", v), lambda p: self.query_verbose(p, "look"),
+                   "Display room descriptions briefly or verbosely under Mystra’s light")
+    self.add_option("output combat", OPTIONS_TYPE_BRIEF, OPTIONS_TYPE_ALL,
+                   lambda p, v: self.set_verbose(p, "combat", v), lambda p: self.query_verbose(p, "combat"),
+                   "Show combat messages fully or only damage dealt")
+    self.add_option("output errors", OPTIONS_TYPE_BRIEF, OPTIONS_TYPE_CRE_ONLY,
+                   lambda p, v: self.set_verbose(p, "errors", v), lambda p: self.query_verbose(p, "errors"),
+                   "Display errors briefly for creators")
+    self.add_option("output score", OPTIONS_TYPE_BRIEF, OPTIONS_TYPE_ALL,
+                   lambda p, v: self.set_verbose(p, "score", v), lambda p: self.query_verbose(p, "score"),
+                   "Detail level for your adventurer’s score")
+    self.add_option("output accent", ["mangle", "unadulterated"], OPTIONS_TYPE_ALL,
+                   lambda p, v: setattr(p.attrs, "mangle_accent", v == "mangle"), lambda p: "mangle" if p.attrs.get("mangle_accent", False) else "unadulterated",
+                   "Hear speech with regional Forgotten Realms accents or pure")
+    self.add_option("output names", OPTIONS_TYPE_BRIEF, OPTIONS_TYPE_ALL,
+                   lambda p, v: self.set_verbose(p, "names", v), lambda p: self.query_verbose(p, "names"),
+                   "Show names with titles as in Waterdeep’s rolls")
+    self.add_option("output htell", OPTIONS_TYPE_BRIEF, OPTIONS_TYPE_ALL,
+                   lambda p, v: self.set_verbose(p, "htell", v), lambda p: self.query_verbose(p, "htell"),
+                   "Include timestamps in historical tells")
+    self.add_option("output msgout", OPTIONS_TYPE_STRING, OPTIONS_TYPE_CRE_ONLY,
+                   lambda p, v: setattr(p.attrs, "msgout", v), lambda p: p.attrs.get("msgout", "$N departs $T."),
+                   "Message when you leave a place")
+    self.add_option("output msgin", OPTIONS_TYPE_STRING, OPTIONS_TYPE_CRE_ONLY,
+                   lambda p, v: setattr(p.attrs, "msgin", v), lambda p: p.attrs.get("msgin", "$N arrives from $F."),
+                   "Message when you enter a place")
+    self.add_option("output mmsgout", OPTIONS_TYPE_STRING, OPTIONS_TYPE_CRE_ONLY,
+                   lambda p, v: setattr(p.attrs, "mmsgout", v), lambda p: p.attrs.get("mmsgout", "$N fades into the Veil."),
+                   "Message when you shift through the Ethereal Veil")
+    self.add_option("output mmsgin", OPTIONS_TYPE_STRING, OPTIONS_TYPE_CRE_ONLY,
+                   lambda p, v: setattr(p.attrs, "mmsgin", v), lambda p: p.attrs.get("mmsgin", "$N emerges from the Veil."),
+                   "Message when you materialize from the Ethereal Veil")
+    self.add_option("output usercolour", OPTIONS_TYPE_BOOLEAN, OPTIONS_TYPE_ALL,
+                   lambda p, v: setattr(p.attrs, "allow_coloured_souls", v), lambda p: p.attrs.get("allow_coloured_souls", 0),
+                   "See soul messages in adventurer-chosen hues")
+    self.add_option("output plainmaps", OPTIONS_TYPE_BOOLEAN, OPTIONS_TYPE_ALL,
+                   lambda p, v: setattr(p.attrs, "plain_maps", v), lambda p: p.attrs.get("plain_maps", 0),
+                   "View maps without magical coloration")
+    self.add_option("output lookmap", OPTIONS_TYPE_BOOLEAN, OPTIONS_TYPE_PLAYTESTER_ONLY,
+                   lambda p, v: setattr(p.attrs, "terrain_map_in_look", v), lambda p: p.attrs.get("terrain_map_in_look", 0),
+                   "Embed terrain maps in your gaze")
+    self.add_option("output tabstops", OPTIONS_TYPE_INTEGER, OPTIONS_TYPE_CRE_ONLY,
+                   lambda p, v: setattr(p.attrs, "tabstops", v), lambda p: p.attrs.get("tabstops", 8),
+                   "Set tabstop display width")
+    self.add_option("output shorthand", OPTIONS_TYPE_BOOLEAN, OPTIONS_TYPE_ALL,
+                   lambda p, v: setattr(p.attrs, "shorthand_output", v), lambda p: p.attrs.get("shorthand_output", 0),
+                   "Expand shorthand speech from others")
 
-        # Colour options
-        for colour in ["tell", "say", "shout", "inform", "combat", "magic.spellcasting"]:  # Added magic.spellcasting
-            self.add_option(f"colour {colour}", OPTIONS_TYPE_COLOUR, OPTIONS_TYPE_ALL,
-                           lambda p, v, c=colour: self.set_my_colours(p, c, v), lambda p, c=colour: self.colour_event(p, c),
-                           f"The colour for {colour} messages")
-        self.add_option("colour inform", OPTIONS_TYPE_DYNAMIC_GROUP, OPTIONS_TYPE_ALL,
-                       0, lambda p: self.get_inform_colours(p),
-                       "The colours of various informational messages")
-        self.add_option("colour club", OPTIONS_TYPE_DYNAMIC_GROUP, OPTIONS_TYPE_ALL,
-                       0, lambda p: self.get_club_colours(p),
-                       "The colour for club messages")
+    # Colour options (expanded for 2025)
+    for colour in ["tell", "say", "shout", "inform", "combat", "magic", "faith"]:  # Added faith for Forgotten Realms
+        self.add_option(f"colour {colour}", OPTIONS_TYPE_COLOUR, OPTIONS_TYPE_ALL,
+                       lambda p, v, c=colour: self.set_my_colours(p, c, v), lambda p, c=colour: self.colour_event(p, c),
+                       f"Color for {colour} messages in the Realms")
+    self.add_option("colour inform", OPTIONS_TYPE_DYNAMIC_GROUP, OPTIONS_TYPE_ALL,
+                   None, lambda p: self.get_inform_colours(p),
+                   "Colors for various informational messages")
+    self.add_option("colour party", OPTIONS_TYPE_DYNAMIC_GROUP, OPTIONS_TYPE_ALL,  # 'club' → 'party'
+                   None, lambda p: self.get_party_colours(p),
+                   "Colors for party messages")
 
-        # Terminal options
-        self.add_option("terminal type", OPTIONS_TYPE_TERMINAL, OPTIONS_TYPE_ALL,
-                       lambda p, v: setattr(p.attrs, "term_type", v), lambda p: p.attrs.get("term_type", ""),
-                       "The type of terminal you are using")
-        self.add_option("terminal rows", OPTIONS_TYPE_INTEGER, OPTIONS_TYPE_ALL,
-                       lambda p, v: setattr(p.attrs, "rows", v), lambda p: p.attrs.get("rows", 0),
-                       "The number of rows in your terminal")
-        self.add_option("terminal cols", OPTIONS_TYPE_INTEGER, OPTIONS_TYPE_ALL,
-                       lambda p, v: setattr(p.attrs, "cols", v), lambda p: p.attrs.get("cols", 0),
-                       "The number of columns in your terminal")
+    # Terminal options (2025 terminal support)
+    self.add_option("terminal type", OPTIONS_TYPE_TERMINAL, OPTIONS_TYPE_ALL,
+                   lambda p, v: setattr(p.attrs, "term_type", v), lambda p: p.attrs.get("term_type", "ansi"),
+                   "Your scrying device’s terminal type (e.g., ansi, vt100)")
+    self.add_option("terminal rows", OPTIONS_TYPE_INTEGER, OPTIONS_TYPE_ALL,
+                   lambda p, v: setattr(p.attrs, "rows", max(10, min(100, v))), lambda p: p.attrs.get("rows", 24),
+                   "Rows in your viewing portal")
+    self.add_option("terminal cols", OPTIONS_TYPE_INTEGER, OPTIONS_TYPE_ALL,
+                   lambda p, v: setattr(p.attrs, "cols", max(40, min(200, v))), lambda p: p.attrs.get("cols", 80),
+                   "Columns in your viewing portal")
 
-        # Combat options
-        self.add_option("combat wimpy", OPTIONS_TYPE_INTEGER, OPTIONS_TYPE_ALL,
-                       lambda p, v: setattr(p.attrs, "wimpy", v), lambda p: p.attrs.get("wimpy", 20),
-                       "The percentage of your hitpoints at which you will run away")
-        self.add_option("combat monitor", MONITOR_OPTIONS, OPTIONS_TYPE_ALL,
-                       lambda p, v: setattr(p.attrs, "monitor", MONITOR_OPTIONS.index(v)), lambda p: MONITOR_OPTIONS[p.attrs.get("monitor", 1)],
-                       "The frequency of display of your combat monitor")
-        self.add_option("combat tactics attitude", ["insane", "offensive", "neutral", "defensive", "wimp"], OPTIONS_TYPE_ALL,
-                       lambda p, v: self.tactics_handler.set_combat_attitude(p, v), lambda p: self.tactics_handler.query_combat_attitude(p),
-                       "Your combat attitude (see help tactics)")
-        self.add_option("combat tactics response", ["dodge", "neutral", "parry"], OPTIONS_TYPE_ALL,
-                       lambda p, v: self.tactics_handler.set_combat_response(p, v), lambda p: self.tactics_handler.query_combat_response(p),
-                       "Your combat response (see help tactics)")
-        self.add_option("combat tactics parry", ["left", "right", "both"], OPTIONS_TYPE_ALL,
-                       lambda p, v: self.tactics_handler.set_combat_parry(p, v), lambda p: self.tactics_handler.query_combat_parry(p),
-                       "Which hand you will parry with (see help tactics)")
-        self.add_option("combat tactics unarmed_parry", OPTIONS_TYPE_BOOLEAN, OPTIONS_TYPE_ALL,
-                       lambda p, v: self.tactics_handler.set_unarmed_parry(p, v), lambda p: self.tactics_handler.query_unarmed_parry(p),
-                       "Whether you will parry unarmed (see help tactics)")
-        self.add_option("combat tactics attack", ["left", "right", "both"], OPTIONS_TYPE_ALL,
-                       lambda p, v: self.tactics_handler.set_combat_attack(p, v), lambda p: self.tactics_handler.query_combat_attack(p),
-                       "Which hand you will attack with (see help tactics)")
-        self.add_option("combat tactics mercy", ["always", "ask", "never"], OPTIONS_TYPE_ALL,
-                       lambda p, v: self.tactics_handler.set_combat_mercy(p, v), lambda p: self.tactics_handler.query_combat_mercy(p),
-                       "Whether or not you will show mercy to opponents")
-        self.add_option("combat tactics focus", ["upper body", "lower body", "head", "neck", "chest", "abdomen", "arms", "hands", "legs", "feet", "none"], OPTIONS_TYPE_ALL,
-                       lambda p, v: self.tactics_handler.set_combat_focus(p, v), lambda p: self.tactics_handler.query_combat_focus(p),
-                       "Which body part you will focus on in combat (see help tactics)")
-        self.add_option("combat tactics distance", ["long", "medium", "close", "hand-to-hand", "none"], OPTIONS_TYPE_ALL,
-                       lambda p, v: self.tactics_handler.set_combat_distance(p, v), lambda p: self.tactics_handler.query_combat_distance(p),
-                       "Your ideal combat distance (see help tactics)")
-        self.add_option("combat killer", OPTIONS_TYPE_BOOLEAN, OPTIONS_TYPE_ALL,
-                       lambda p, v: setattr(p.attrs, "player_killer", v), lambda p: p.attrs.get("player_killer", 0),
-                       "Whether or not you are a registered player killer")
+    # Combat options (synced with tactics.py)
+    self.add_option("combat wimpy", OPTIONS_TYPE_PERCENTAGE, OPTIONS_TYPE_ALL,
+                   lambda p, v: setattr(p.attrs, "wimpy", v), lambda p: p.attrs.get("wimpy", 20),
+                   "HP percentage to flee from battle")
+    self.add_option("combat monitor", MONITOR_OPTIONS, OPTIONS_TYPE_ALL,
+                   lambda p, v: setattr(p.attrs, "monitor", MONITOR_OPTIONS.index(v)), lambda p: MONITOR_OPTIONS[p.attrs.get("monitor", 1)],
+                   "Frequency of battle status updates")
+    self.add_option("combat tactics attitude", ["insane", "offensive", "neutral", "defensive", "wimp"], OPTIONS_TYPE_ALL,
+                   lambda p, v: self.tactics_handler.set_combat_attitude(p, v), lambda p: self.tactics_handler.query_combat_attitude(p),
+                   "Your stance in combat (see help tactics)")
+    self.add_option("combat tactics response", ["dodge", "parry", "both", "neutral"], OPTIONS_TYPE_ALL,
+                   lambda p, v: self.tactics_handler.set_combat_response(p, v), lambda p: self.tactics_handler.query_combat_response(p),
+                   "Your defense in combat (see help tactics)")
+    self.add_option("combat tactics parry", ["left", "right", "both"], OPTIONS_TYPE_ALL,
+                   lambda p, v: self.tactics_handler.set_combat_parry(p, v), lambda p: self.tactics_handler.query_combat_parry(p),
+                   "Hand used to parry (see help tactics)")
+    self.add_option("combat tactics unarmed_parry", OPTIONS_TYPE_BOOLEAN, OPTIONS_TYPE_ALL,
+                   lambda p, v: self.tactics_handler.set_unarmed_parry(p, v), lambda p: self.tactics_handler.query_unarmed_parry(p),
+                   "Parry unarmed if weaponless")
+    self.add_option("combat tactics attack", ["left", "right", "both"], OPTIONS_TYPE_ALL,
+                   lambda p, v: self.tactics_handler.set_combat_attack(p, v), lambda p: self.tactics_handler.query_combat_attack(p),
+                   "Hand used to strike (see help tactics)")
+    self.add_option("combat tactics mercy", ["always", "ask", "never"], OPTIONS_TYPE_ALL,
+                   lambda p, v: self.tactics_handler.set_combat_mercy(p, v), lambda p: self.tactics_handler.query_combat_mercy(p),
+                   "Mercy toward foes")
+    self.add_option("combat tactics focus", ["head", "chest", "arms", "legs", "none"], OPTIONS_TYPE_ALL,
+                   lambda p, v: self.tactics_handler.set_combat_focus(p, v), lambda p: self.tactics_handler.query_combat_focus(p),
+                   "Targeted body part in combat")
+    self.add_option("combat tactics distance", OPTIONS_TYPE_INTEGER, OPTIONS_TYPE_ALL,
+                   lambda p, v: self.tactics_handler.set_combat_distance(p, v), lambda p: self.tactics_handler.query_combat_distance(p),
+                   "Preferred combat range (0 for none)")
+    self.add_option("combat killer", OPTIONS_TYPE_BOOLEAN, OPTIONS_TYPE_ALL,
+                   lambda p, v: setattr(p.attrs, "player_killer", v), lambda p: p.attrs.get("player_killer", 0),
+                   "Register as a hero-slayer")
 
-        # Input options
-        self.add_option("input ambiguous", OPTIONS_TYPE_BOOLEAN, OPTIONS_TYPE_ALL,
-                       lambda p, v: self.change_bool_property(p, "ambiguous", not v), lambda p: not p.attrs.get("ambiguous", 0),
-                       "Should the parser notify you of ambiguities")
-        self.add_option("input andascomma", OPTIONS_TYPE_BOOLEAN, OPTIONS_TYPE_ALL,
-                       lambda p, v: self.change_bool_property(p, "andascomma", not v), lambda p: not p.attrs.get("andascomma", 0),
-                       "Should 'and' be treated as a comma (an inclusive list)")
-        self.add_option("input editor", ["menu", "magic", "command", "ed"], OPTIONS_TYPE_ALL,
-                       lambda p, v: setattr(p.attrs, "editor", v), lambda p: p.attrs.get("editor", "menu"),
-                       "Your preferred editor")
-        self.add_option("input shorthand", OPTIONS_TYPE_BOOLEAN, OPTIONS_TYPE_ALL,
-                       lambda p, v: p.attrs.setdefault("shorthand", v), lambda p: p.attrs.get("shorthand", 0),
-                       "Convert your shorthand typing into long form")
+    # Faith options (new for Forgotten Realms)
+    self.add_option("faith devotion", OPTIONS_TYPE_FAITH, OPTIONS_TYPE_ALL,
+                   lambda p, v: setattr(p.attrs, "devotion", v), lambda p: p.attrs.get("devotion", "none"),
+                   "Your patron deity (e.g., Mystra, Tymora)")
 
+    # Input, earmuff, creator, personal, playtester, player options remain mostly unchanged, just thematic tweaks
+    self.add_option("input ambiguous", OPTIONS_TYPE_BOOLEAN, OPTIONS_TYPE_ALL,
+                   lambda p, v: self.change_bool_property(p, "ambiguous", not v), lambda p: not p.attrs.get("ambiguous", 0),
+                   "Notify of unclear commands")
+    self.add_option("input andascomma", OPTIONS_TYPE_BOOLEAN, OPTIONS_TYPE_ALL,
+                   lambda p, v: self.change_bool_property(p, "andascomma", not v), lambda p: not p.attrs.get("andascomma", 0),
+                   "Treat 'and' as a list separator")
+    self.add_option("input editor", ["menu", "magic", "command", "ed"], OPTIONS_TYPE_ALL,
+                   lambda p, v: setattr(p.attrs, "editor", v), lambda p: p.attrs.get("editor", "menu"),
+                   "Your tome-editing tool")
+    self.add_option("input shorthand", OPTIONS_TYPE_BOOLEAN, OPTIONS_TYPE_ALL,
+                   lambda p, v: setattr(p.attrs, "shorthand", v), lambda p: p.attrs.get("shorthand", 0),
+                   "Expand your shorthand scribing")
+    
         # Earmuff options
         earmuff_events = ["shout", "newbie", "cryer", "remote-soul", "multiple-soul", "multiple-tell", "teach", "tell", "remote", "multiple-remote"]
         for event in earmuff_events:
@@ -253,20 +261,23 @@ class OptionsHandler:
                        lambda p, v: self.set_mxp_disable(p, v), lambda p: self.query_mxp_disable(p),
                        "Disable MXP support")
 
-    def init_options(self, obj: Player):
-        if "options" not in obj.attrs:
-            obj.attrs["options"] = {
-                "output": {"look": 0, "combat": 0, "errors": 0, "score": 0, "names": 0, "htell": 0},
-                "combat": {"wimpy": 20, "monitor": 1, "killer": 0},
-                "tactics": {},
-                "colour": {},
-                "terminal": {"type": "", "rows": 0, "cols": 0},
-                "input": {"ambiguous": 0, "andascomma": 0, "editor": "menu", "shorthand": 0},
-                "earmuff": {"state": "off", "cut-through": 0},
-                "personal": {"description": "none", "real_name": "none", "location": "none", "homepage": "none", "email": "none", "birthday": "none", "execinclude": "none", "auto_teach": 0, "travel": "walk"},
-                "playtester": {"protection": 0, "roleplaying": 0},
-                "player": {"follow_groups": 0, "follow_friends": 0, "follow_everyone": 0, "lead_behind": 0, "mxp_disable": 0}
-            }
+def init_options(self, obj: Player):
+    if "options" not in obj.attrs:
+        obj.attrs["options"] = {
+            "output": {"look": 0, "combat": 0, "errors": 0, "score": 0, "names": 0, "htell": 0},
+            "combat": {"wimpy": 20, "monitor": 1, "killer": 0},
+            "tactics": {},
+            "colour": {},
+            "terminal": {"type": "ansi", "rows": 24, "cols": 80},
+            "input": {"ambiguous": 0, "andascomma": 0, "editor": "menu", "shorthand": 0},
+            "earmuff": {"state": "off", "cut-through": 0},
+            "faith": {"devotion": "none"},  # Default no deity
+            "personal": {"description": "none", "real_name": "none", "location": "none", "homepage": "none", "email": "none", "birthday": "none", "execinclude": "none", "auto_teach": 0, "travel": "walk"},
+            "playtester": {"protection": 0, "roleplaying": 0},
+            "player": {"follow_groups": 0, "follow_friends": 0, "follow_everyone": 0, "lead_behind": 0, "mxp_disable": 0}
+        }
+        # Set defaults as before, plus devotion
+        obj.attrs.setdefault("devotion", "none")
             obj.attrs.setdefault("mangle_accent", False)
             obj.attrs.setdefault("msgout", "")
             obj.attrs.setdefault("msgin", "")
@@ -558,19 +569,20 @@ class OptionsHandler:
         return []
 
     def query_option_values(self, player: Player, name: str) -> List[str]:
-        stuff = self.query_bottom_sub_option(player, name.split())
-        if isinstance(stuff, option):
-            if isinstance(stuff.type, list):
-                return stuff.type
-            return {
-                OPTIONS_TYPE_BRIEF: ["brief", "verbose"],
-                OPTIONS_TYPE_BOOLEAN: ["on", "off"],
-                OPTIONS_TYPE_INTEGER: ["integer"],
-                OPTIONS_TYPE_STRING: ["string"],
-                OPTIONS_TYPE_PERCENTAGE: ["0..100"],
-                OPTIONS_TYPE_COLOUR: ["none", "default", "colour"]
-            }.get(stuff.type, [])
-        return []
+    stuff = self.query_bottom_sub_option(player, name.split())
+    if isinstance(stuff, option):
+        if isinstance(stuff.type, list):
+            return stuff.type
+        return {
+            OPTIONS_TYPE_BRIEF: ["brief", "verbose"],
+            OPTIONS_TYPE_BOOLEAN: ["on", "off"],
+            OPTIONS_TYPE_INTEGER: ["integer"],
+            OPTIONS_TYPE_STRING: ["string"],
+            OPTIONS_TYPE_PERCENTAGE: ["0..100"],
+            OPTIONS_TYPE_COLOUR: ["none", "default", "colour"],
+            OPTIONS_TYPE_FAITH: ["none", "Mystra", "Tymora", "Bane", "Shar"]  # Forgotten Realms deities
+        }.get(stuff.type, [])
+    return []
 
     def query_option_value(self, player: Player, path: str) -> str:
         stuff = self.query_bottom_sub_option(player, path.split())

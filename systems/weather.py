@@ -1,3 +1,5 @@
+# Imported to: room.py, map_handler.py
+# Imports from: driver.py
 # /mnt/home2/mud/systems/weather.py
 from typing import Dict, List, Optional, Tuple
 from ..driver import driver, MudObject, Player
@@ -39,19 +41,29 @@ class WeatherHandler(MudObject):
         self.moonupdate: int = 0
 
     def setup(self):
-        """Initializes the weather handler for Forgotten Realms."""
-        self.set_name("weather controller")
-        self.set_short("weather controller")
-        self.set_long("A mystical device attuned to the weather patterns of Faerûn.\n")
-        if os.path.exists(FILE_NAME):
-            self.restore_object(FILE_NAME)  # Placeholder for file restore
-        for climate in CLIMATES:
-            self._pattern.setdefault(climate, [0, 0, 0])
-            self._current.setdefault(climate, [0, 0, 0])
-        driver.call_out(self.update_weather, UPDATE_SPEED)
-        self.set_day()
-        self.update_pattern()
-
+    self.set_name("weather controller")
+    self.set_short("weather controller")
+    self.set_long("A mystical orb attuned to Faerûn’s skies, blessed by Aerdrie Faenya.\n")
+    if os.path.exists(FILE_NAME):
+        data = driver.load_object(FILE_NAME)
+        if data:
+            self._pattern = data.get("_pattern", {})
+            self._current = data.get("_current", {})
+            self._variance = data.get("_variance", [10, 75, 20])
+            self._lastupdate = data.get("_lastupdate", 0)
+            self._day = data.get("_day", 0)
+            self._sunrise = data.get("_sunrise", 0)
+            self._sunset = data.get("_sunset", 0)
+            self._toy = data.get("_toy", 0)
+            self.mooncycle = data.get("mooncycle", 0)
+            self.moonupdate = data.get("moonupdate", 0)
+    for climate in CLIMATES:
+        self._pattern.setdefault(climate, [0, 0, 0])
+        self._current.setdefault(climate, [0, 0, 0])
+    driver.call_out(self.update_weather, UPDATE_SPEED // 2)  # 2025: 2.5 min updates
+    self.set_day()
+    self.update_pattern()
+    
     def weather_notify(self, room: MudObject, notifications: int) -> bool:
         """Adds a room to the notification list."""
         if notifications < 0 or notifications > (NOTIFY_TEMPERATURE | NOTIFY_CLOUD | NOTIFY_RAIN | NOTIFY_DAY):
@@ -554,8 +566,19 @@ class WeatherHandler(MudObject):
         return (18 * MINUTES_PER_HOUR) - adjust
 
     def save_object(self, filename: str):
-        """Placeholder for saving state."""
-        pass
+    data = {
+        "_pattern": self._pattern,
+        "_current": self._current,
+        "_variance": self._variance,
+        "_lastupdate": self._lastupdate,
+        "_day": self._day,
+        "_sunrise": self._sunrise,
+        "_sunset": self._sunset,
+        "_toy": self._toy,
+        "mooncycle": self.mooncycle,
+        "moonupdate": self.moonupdate
+    }
+    driver.save_object(filename, data)
 
     def restore_object(self, filename: str):
         """Placeholder for restoring state."""

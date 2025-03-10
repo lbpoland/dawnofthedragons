@@ -1,3 +1,5 @@
+# Imported to: combat.py, living.py
+# Imports from: driver.py
 # /mnt/home2/mud/systems/weapon_logic.py
 from typing import Dict, Optional, List
 from ..driver import driver, Player, MudObject
@@ -10,15 +12,16 @@ class Weapon:
         self.oid = oid
         self.name = name
         self.attrs: Dict = {
-            "damage": damage,  # Base damage (e.g., 25 per category jump from "extremely low")
-            "weight": weight,  # In pounds, affects AP cost
-            "length": length,  # In units, affects distance combat
-            "damage_type": damage_type,  # slashing, piercing, bludgeoning, magic, blunt
-            "condition": condition,  # 0-100, degrades with use
-            "enchantment": 0,  # Bonus damage from magic (Forgotten Realms)
+            "damage": damage,
+            "weight": weight,
+            "length": length,
+            "damage_type": damage_type,
+            "condition": condition,
+            "enchantment": 0,
             "is_weapon": True,
             "is_shield": False,
-            "category": self.determine_category(damage)  # e.g., "extremely low" = 1
+            "category": self.determine_category(damage),
+            "mystra_blessing": 0  # 2025 Forgotten Realms bonus
         }
 
     def determine_category(self, damage: int) -> str:
@@ -27,11 +30,11 @@ class Weapon:
         return categories[index]
 
     def query_damage(self) -> int:
-        base_damage = self.attrs["damage"]
-        enchantment_bonus = self.attrs["enchantment"]
-        condition_factor = max(0, min(1, self.attrs["condition"] / 100))
-        return int((base_damage + enchantment_bonus) * condition_factor)
-
+    base_damage = self.attrs["damage"]
+    enchantment_bonus = self.attrs["enchantment"] + self.attrs["mystra_blessing"]
+    condition_factor = max(0, min(1, self.attrs["condition"] / 100))
+    return int((base_damage + enchantment_bonus) * condition_factor)
+    
     def query_weight(self) -> int:
         return self.attrs["weight"]
 

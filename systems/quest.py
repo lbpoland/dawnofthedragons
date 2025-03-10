@@ -1,3 +1,5 @@
+# Imported to: living.py, library.py
+# Imports from: driver.py
 # /mnt/home2/mud/systems/quest.py
 from typing import Dict, List, Optional, Tuple, Union
 from ..driver import driver, Player, MudObject
@@ -7,14 +9,21 @@ import os
 
 class QuestHandler:
     def __init__(self):
-        self.quest_name: List[str] = []
-        self.quest_level: List[int] = []
-        self.quest_title: List[str] = []
-        self.quest_story: List[str] = []
-        self.last_done_by: List[str] = []
-        self.num_times_done: List[int] = []
-        self.quest_status: List[int] = []
-        self.total_qp: int = 0
+        self.quest_name: List[str] = [
+            "veil_of_mystra", "shadows_of_menzoberranzan"  # 2025 Forgotten Realms quests
+        ]
+        self.quest_level: List[int] = [5, 10]  # QP values
+        self.quest_title: List[str] = [
+            "Veilweaver of Mystra", "Shadowbane of the Underdark"
+        ]
+        self.quest_story: List[str] = [
+            "Restored Mystra’s weave in the Ethereal Veil.",
+            "Vanquished a drow priestess in Menzoberranzan."
+        ]
+        self.last_done_by: List[str] = ["nobody", "nobody"]
+        self.num_times_done: List[int] = [0, 0]
+        self.quest_status: List[int] = [1, 1]  # 1 = active
+        self.total_qp: int = sum(self.quest_level)
         self.SAVE_FILE = "/save/quests"
         self.BACKUP_FILE = "/save/quests/quests"
         self.TEXTS_DIR = "/save/quests/"
@@ -172,23 +181,27 @@ class QuestHandler:
         return self.quest_story.copy()
 
     def quest_completed(self, name: str, quest: str, prev_ob: MudObject):
-        driver.log_file("QUESTS", f"{time.ctime()} {name} completed {quest}\n")
-        driver.user_event("inform", f"{name} completes {quest}", "quest")
-        word = prev_ob.name if prev_ob.name else prev_ob.oid
-        driver.log_file("QUESTS", f"given by {word}\n")
-        temp = self.quest_name.index(quest) if quest in self.quest_name else -1
-        if temp == -1:
-            driver.log_file("QUESTS", "non existent quest\n")
-            return
-        self.last_done_by[temp] = name
-        self.num_times_done[temp] += 1
-        self.save_quests()
+    temp = self.quest_name.index(quest) if quest in self.quest_name else -1
+    if temp == -1:
+        driver.log_file("QUESTS", f"{time.ctime()} {name} tried non-existent quest {quest}\n")
+        return
+    self.last_done_by[temp] = name
+    self.num_times_done[temp] += 1
+    self.save_quests()
+    driver.log_file("QUESTS", f"{time.ctime()} {name} completed {quest} (given by {prev_ob.name or prev_ob.oid})\n")
+    driver.user_event("inform", f"{name} has earned the title '{self.quest_title[temp]}'!", "quest")
+    player = driver.find_player(name)
+    if player:
+        player.attrs.setdefault("titles", []).append(self.quest_title[temp])
+        player.attrs["qp"] = player.attrs.get("qp", 0) + self.quest_level[temp]  # 2025 QP tracking
+        driver.save_object(player)
 
     def query_player_fame(self, name: str) -> int:
-        if not name or not driver.player_handler.test_user(name):
-            return 0
-        player_qp = driver.library.query_quest_points(name)
-        return (player_qp * 125) // self.query_total_qp()
+    if not name or not driver.player_handler.test_user(name):
+        return 0
+    player_qp = driver.library.query_quest_points(name)
+    total_qp = max(1, self.query_total_qp())  # Avoid division by zero
+    return min(100, (player_qp * 150) // total_qp)  # 2025 fame cap at 100
 
     def query_fame_str(self, name: str) -> str:
         fame = self.query_player_fame(name)
@@ -217,27 +230,7 @@ class QuestHandler:
 
 quest_handler = QuestHandler()
 
-class QuestCommand:
-    def __init__(self):
-        self.names: List[str] = []
-        self.makers: Dict[Player, Tuple[int, List]] = {}
 
-    async def cmd(self, player: str = None, sorted: bool = False) -> int:
-        quests = quest_handler.query_quest_names() if not player else driver.library.query_quests(player)
-        if not quests:
-            driver.add_failed_mess("That player has not done any quests.\n")
-            return 0
-        if sorted:
-            quests.sort()
-        text = f"$P$Quest list$P$\n{'Total quests on Discworld' if not player else f'Quests done for player {player}'} :-\n\n"
-        for i, quest in enumerate(quests):
-            text += f"{i+1}. {quest} ({quest_handler.query_quest_title(quest)}) {quest_text(quest)}\n"
-        await driver.tell_object(driver.this_player(), text)
-        return 1
-
-    def quest_text(self, quest: str) -> str:
-        status = quest_handler.query_quest_status(quest)
-        return "(inactive)" if status == 0 else "" if status == 1 else "(broken)"
 
     def query_patterns(self) -> List[Tuple[str, Callable]]:
         return [
@@ -246,12 +239,36 @@ class QuestCommand:
             ("<string'player'> sorted", lambda p: asyncio.run(self.cmd(p, 1)))
         ]
 
+class QuestCommand:
+    def __init__(self):
+        self.names: List[str] = []
+        self.makers: Dict[Player, Tuple[int, List]] = {}
+
+    async def cmd(self, player: Optional[str] = None, sorted: bool = False) -> int:
+        quests = quest_handler.query_quest_names() if not player else driver.library.query_quests(player)
+        if not quests:
+            await driver.add_failed_mess(f"{'No quests recorded in the Realms' if not player else f'{player} has yet to prove their legend.'}\n")
+            return 0
+        if sorted:
+            quests.sort()
+        text = f"$P$Legendary Deeds$P$\n{'Realms-wide quests' if not player else f'Deeds of {player}'} :-\n\n"
+        for i, quest in enumerate(quests):
+            text += f"{i+1}. {quest} ({quest_handler.query_quest_title(quest)}) {self.quest_text(quest)}\n"
+        await driver.tell_object(driver.this_player(), text)
+        return 1
+
+    def quest_text(self, quest: str) -> str:
+        status = quest_handler.query_quest_status(quest)
+        return "(inactive)" if status == 0 else "(lost to the Veil)" if status == -1 else ""
+
 quest_command = QuestCommand()
 
 async def init(driver_instance):
+    global driver
     driver = driver_instance
-    for player in driver.players:
-        player.add_action("quests", lambda obj, caller, arg: asyncio.run(quest_command.cmd(arg.split()[0] if arg else None, "sorted" in arg)))
+    quest_handler.load_quests()
+    for player in driver.players.values():
+        player.add_action("quests", lambda obj, caller, arg: asyncio.create_task(quest_command.cmd(arg.split()[0] if arg else None, "sorted" in arg)))
 
 def quest_text(quest: str) -> str:
     return quest_command.quest_text(quest)
